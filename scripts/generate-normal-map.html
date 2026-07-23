@@ -1,0 +1,59 @@
+<!doctype html>
+<!--
+  One-time, zero-dependency normal-map generator (Phase 3 tooling).
+  Open this file in a browser, pick the logo PNG (public/assets/asterisk.png),
+  and it downloads `asterisk-normal.png`. Uses the canvas 2D API only — no npm deps,
+  so runtime ships only three + R3F. Re-run if the source logo changes.
+
+  Algorithm: luminance -> light 3x3 blur (smooth bevel relief, not literal detail)
+  -> Sobel gradient -> tangent-space normals encoded to RGB, source alpha as mask.
+-->
+<meta charset="utf-8" />
+<title>fUSD normal-map generator</title>
+<input type="file" accept="image/png" id="f" />
+<p id="log">Pick public/assets/asterisk.png…</p>
+<script>
+const STRENGTH = 2.0;
+const MAX_W = 1024;
+document.getElementById('f').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const bmp = await createImageBitmap(file);
+  const W = Math.min(MAX_W, bmp.width);
+  const H = Math.round(W * bmp.height / bmp.width); // preserve aspect (no stretch)
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(bmp, 0, 0, W, H);
+  const d = ctx.getImageData(0, 0, W, H).data;
+  const N = W * H;
+  const lum = new Float32Array(N), alpha = new Uint8ClampedArray(N);
+  for (let i = 0; i < N; i++) {
+    lum[i] = (0.299 * d[i*4] + 0.587 * d[i*4+1] + 0.114 * d[i*4+2]) / 255;
+    alpha[i] = d[i*4+3];
+  }
+  const at = (x, y) => Math.min(H-1, Math.max(0, y)) * W + Math.min(W-1, Math.max(0, x));
+  const lb = new Float32Array(N);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    let s = 0; for (let dy=-1; dy<=1; dy++) for (let dx=-1; dx<=1; dx++) s += lum[at(x+dx, y+dy)];
+    lb[y*W+x] = s / 9;
+  }
+  const out = ctx.createImageData(W, H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const tl=lb[at(x-1,y-1)],t=lb[at(x,y-1)],tr=lb[at(x+1,y-1)],l=lb[at(x-1,y)],r=lb[at(x+1,y)],bl=lb[at(x-1,y+1)],b=lb[at(x,y+1)],br=lb[at(x+1,y+1)];
+    const gx=(tr+2*r+br)-(tl+2*l+bl), gy=(bl+2*b+br)-(tl+2*t+tr);
+    let nx=-gx*STRENGTH, ny=-gy*STRENGTH, nz=1.0;
+    const L=Math.hypot(nx,ny,nz)||1; nx/=L; ny/=L; nz/=L;
+    const o=(y*W+x)*4;
+    out.data[o]=Math.round((nx*0.5+0.5)*255);
+    out.data[o+1]=Math.round((ny*0.5+0.5)*255);
+    out.data[o+2]=Math.round((nz*0.5+0.5)*255);
+    out.data[o+3]=alpha[y*W+x];
+  }
+  ctx.putImageData(out, 0, 0);
+  const a = document.createElement('a');
+  a.href = c.toDataURL('image/png');
+  a.download = 'asterisk-normal.png';
+  a.click();
+  document.getElementById('log').textContent = `Generated ${W}×${H} normal map → downloaded.`;
+});
+</script>

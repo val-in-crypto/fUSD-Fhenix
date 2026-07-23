@@ -1,26 +1,213 @@
 @import "tailwindcss";
 
+/* ── Design tokens (authoritative; from Figma 40:4) ───────────────────────────
+   Raw CSS variables with the documented names, so they're usable in plain CSS.
+   Mapped into the Tailwind theme below as color utilities (text-ink, bg-hairline,
+   border-hairline, bg-glow-cyan, text-mono-muted, …). Never hardcode a hex that
+   has a token here. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #ffffff; /* hero background */
+  --ink: #001623; /* headline / primary text */
+  --ink-deep: #011623; /* registration squares, deepest marks */
+  --mono-muted: #777b7d; /* all Geist Mono labels */
+  --hairline: #e4eaee; /* vertical dividers, FHENIX pill fill */
+  --glow-cyan: #0ad9dc; /* exact glow fill (ships at 0.7 opacity + blur 150) */
+
+  /* Display face swap point — Helvetica Neue is licensed; point this one variable
+     at a licensed webfont when available. System Helvetica stack stands in for now. */
+  --font-display: "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-ink: var(--ink);
+  --color-ink-deep: var(--ink-deep);
+  --color-mono-muted: var(--mono-muted);
+  --color-hairline: var(--hairline);
+  --color-glow-cyan: var(--glow-cyan);
+
+  --font-display: var(--font-display);
   --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-instrument-serif);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+html,
+body {
+  min-height: 100%; /* page scrolls well past the viewport now */
+}
+
+/* Backed-by marquee. Track holds two identical copies, so -50% loops seamlessly.
+   Pure CSS so it degrades correctly without JS. */
+@keyframes marquee-x {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.marquee-track {
+  animation: marquee-x 34s linear infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+  }
+}
+
+/* ── "Software has modes" — card entrance + per-element visual reveals ─────────
+   Each card's inner element carries --enter-delay for stagger. Effects play only
+   once the card is scrolled in (data-shown="true"). --ease-out matches MOTION.ease.out. */
+:root {
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mode-card {
+  opacity: 0;
+  transform: translateY(18px) scale(0.97);
+  transition:
+    opacity 600ms var(--ease-out) var(--enter-delay, 0ms),
+    transform 600ms var(--ease-out) var(--enter-delay, 0ms);
+}
+.mode-card[data-shown="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+/* the visual inside each card sits hidden per its effect until the card shows */
+.mode-fx-wipe {
+  clip-path: inset(0 100% 0 0);
+}
+.mode-fx-scan {
+  clip-path: inset(0 0 100% 0);
+}
+.mode-fx-gleam {
+  transform: scale(0.92);
+}
+.mode-card[data-shown="true"] .mode-fx-wipe {
+  animation: fx-wipe 900ms var(--ease-out) calc(var(--enter-delay, 0ms) + 200ms) both;
+}
+.mode-card[data-shown="true"] .mode-fx-scan {
+  animation: fx-scan 900ms var(--ease-out) calc(var(--enter-delay, 0ms) + 200ms) both;
+}
+.mode-card[data-shown="true"] .mode-fx-gleam {
+  animation: fx-pop 700ms var(--ease-out) calc(var(--enter-delay, 0ms) + 150ms) both;
+}
+
+/* moving cyan scan line over the fingerprint card */
+.mode-scanbar {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--glow-cyan), transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+.mode-card[data-shown="true"] .mode-scanbar {
+  animation: fx-scanbar 1000ms var(--ease-out) calc(var(--enter-delay, 0ms) + 250ms) both;
+}
+
+/* one-time specular gleam sweeping across the coin card, clipped to its rounded shape */
+.mode-gleam {
+  position: absolute;
+  inset: 4px;
+  border-radius: 24px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.mode-gleam::before {
+  content: "";
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  width: 42%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  transform: translateX(-160%) skewX(-18deg);
+  opacity: 0;
+}
+.mode-card[data-shown="true"] .mode-gleam::before {
+  animation: fx-gleam 1100ms var(--ease-out) calc(var(--enter-delay, 0ms) + 350ms) both;
+}
+
+@keyframes fx-wipe {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes fx-scan {
+  from {
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes fx-pop {
+  from {
+    transform: scale(0.92);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+@keyframes fx-scanbar {
+  0% {
+    top: 2%;
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    top: 98%;
+    opacity: 0;
+  }
+}
+@keyframes fx-gleam {
+  0% {
+    transform: translateX(-160%) skewX(-18deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(320%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mode-card {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .mode-fx-wipe,
+  .mode-fx-scan,
+  .mode-fx-gleam {
+    clip-path: none !important;
+    transform: none !important;
+    animation: none !important;
+  }
+  .mode-scanbar,
+  .mode-gleam {
+    display: none !important;
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
 }
