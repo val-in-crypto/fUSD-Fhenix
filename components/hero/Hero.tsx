@@ -157,6 +157,22 @@ export default function Hero() {
           <WaitlistPill />
         </div>
 
+        {/* Status line, in the right column on the CTA's own line. Height matches the pill
+            and centres against it, so the two align optically rather than by top edge —
+            the pill's text sits inside 10px of padding and a 1px border. Size is fluid
+            because the right column is only ~180px wide at the md breakpoint. */}
+        <div
+          className="absolute flex items-center"
+          style={{ left: "calc(75% + 7px)", top: "68.359%", height: 42 }}
+        >
+          <p
+            className="font-serif whitespace-nowrap text-glow-cyan"
+            style={{ fontSize: "clamp(18px, 2.2vw, 32px)", letterSpacing: "-0.32px", lineHeight: 0.9 }}
+          >
+            Live on Arbitrum soon
+          </p>
+        </div>
+
         <div className="absolute" style={{ left: 1345, top: "91.406%" }}>
           <Socials />
         </div>
@@ -204,7 +220,17 @@ export default function Hero() {
           <GlossyLogo />
         </div>
 
-        <div className="relative mt-6 flex items-center justify-between">
+        {/* Same status line. It cannot share the CTA's row here — pill, line and socials
+            come to ~344px against 327px of content width at 375px — so it takes its own
+            right-aligned line directly above, which keeps it reading as the CTA's pair. */}
+        <p
+          className="relative mt-6 text-right font-serif text-glow-cyan"
+          style={{ fontSize: 20, letterSpacing: "-0.2px", lineHeight: 0.9 }}
+        >
+          Live on Arbitrum soon
+        </p>
+
+        <div className="relative mt-3 flex items-center justify-between">
           <WaitlistPill />
           <Socials />
         </div>
