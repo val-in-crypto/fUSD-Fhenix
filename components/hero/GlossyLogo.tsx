@@ -1,7 +1,7 @@
 "use client";
 
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { OrthographicCamera, useTexture } from "@react-three/drei";
+import { PerspectiveCamera, useTexture } from "@react-three/drei";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
@@ -10,6 +10,9 @@ import { fragmentShader, vertexShader } from "./shaders/glossyLogo";
 
 const BASE_ROTATION = (-25.98 * Math.PI) / 180;
 const VIEW = 2.5; // world units across the smaller viewport edge (larger = smaller logo)
+// Vertical FOV. Narrow on purpose: enough foreshortening for the tilt to read as depth,
+// short of the wide-angle stretch that would fight the flat, product-shot framing.
+const FOV = 30;
 
 // physics feel — defaults; overridable via props for art direction
 const DEFAULTS = {
@@ -17,11 +20,38 @@ const DEFAULTS = {
   inertiaDecay: 0.94, // per 1/60 s
   tiltClamp: 30, // degrees
   idleSpeed: 0.5,
+  scrollReveal: 0.9, // ceiling of scroll's contribution to the reveal; 0 disables it
+  idleTilt: 0.55, // fraction of tiltClamp used by the resting wobble; 0 = flat spin only
+  // Floor under the reveal, so the facets keep catching the dollar during the idle turn
+  // rather than only on a flick or a scroll. Drag and scroll still bloom above it.
+  restReveal: 0.6,
+  // Ceiling on the dollar-glass reveal, reached when the pointer is over the logo. It rests
+  // at plain cyan glass and fades the portrait in as the cursor approaches; 0 disables the
+  // reflection outright without touching the mask tuning.
+  dollarReveal: 1,
+  // How far the plate leans toward the cursor on approach, as a fraction of tiltClamp.
+  hoverLean: 0.5,
 };
 const SPIN_SENS = 0.01;
 const TILT_SENS_X = 0.002;
 const TILT_SENS_Y = 0.006;
 const TILT_DECAY = 0.9;
+// Scroll speed (px/s) that reads as a "full" reveal — roughly one brisk wheel flick.
+const SCROLL_REF = 1400;
+// Per 1/60 s falloff of the scroll signal once the page stops moving. Slower than the
+// spin's inertiaDecay so the reflection lingers a beat instead of snapping off.
+const SCROLL_DECAY = 0.88;
+// Rad/s of the resting tilt wobble. The two axes run at different rates so they trace a
+// slow lissajous rather than a repeating figure-eight.
+const IDLE_TILT_SPEED = 0.42;
+const IDLE_TILT_RATIO = 0.68; // second axis rate, relative to the first
+// Pointer proximity, measured from the logo's centre in units of its half-size. Inside
+// HOVER_NEAR the reflection is at full strength; past HOVER_FAR it is off. HOVER_FAR is
+// deliberately beyond the plate itself so the reflection begins to answer as the cursor
+// approaches, rather than snapping on at the edge of the canvas.
+const HOVER_NEAR = 0.75;
+const HOVER_FAR = 1.9;
+const HOVER_EASE = 6; // approach rate per second toward the measured proximity
 // multiplier on idleSpeed -> resting angular velocity (rad/s); default 0.5*0.2 = 0.1 rad/s,
 // a full turn in ~63s (luxury-watch pace).
 const IDLE_VEL = 0.2;
@@ -33,6 +63,11 @@ export type GlossyLogoProps = {
   inertiaDecay?: number;
   tiltClamp?: number; // degrees
   idleSpeed?: number;
+  scrollReveal?: number;
+  idleTilt?: number;
+  restReveal?: number;
+  dollarReveal?: number;
+  hoverLean?: number;
 };
 
 function detectWebGL(): boolean {
@@ -50,8 +85,13 @@ function detectWebGL(): boolean {
 function FitCamera() {
   const { camera, size } = useThree();
   useEffect(() => {
-    const cam = camera as THREE.OrthographicCamera;
-    cam.zoom = Math.min(size.width, size.height) / VIEW;
+    const cam = camera as THREE.PerspectiveCamera;
+    const aspect = size.width / Math.max(1, size.height);
+    // Dolly the camera so VIEW world units still span the smaller viewport edge — the same
+    // framing the orthographic zoom gave, so the logo keeps its designed on-screen size and
+    // only gains perspective. fov comes from the JSX prop and aspect from R3F's resize
+    // handling, so distance is the only thing left to solve for.
+    cam.position.z = VIEW / (2 * Math.tan((FOV * Math.PI) / 360) * Math.min(1, aspect));
     cam.updateProjectionMatrix();
   }, [camera, size]);
   return null;
@@ -62,6 +102,11 @@ function LogoQuad({
   inertiaDecay,
   tiltClamp,
   idleSpeed,
+  scrollReveal,
+  idleTilt,
+  restReveal,
+  dollarReveal,
+  hoverLean,
   reducedMotion,
   onReady,
 }: Required<GlossyLogoProps> & { reducedMotion: boolean; onReady: () => void }) {
@@ -70,31 +115,34 @@ function LogoQuad({
   const maxTilt = (tiltClamp * Math.PI) / 180;
   const ready = useRef(false);
 
-  const [base, normal, dollar, env] = useTexture([
+  const [base, normal, bill, env] = useTexture([
     "/assets/tex-base.png",
     "/assets/tex-normal.png",
-    "/assets/tex-dollar-a.png",
+    "/assets/bill-100.png",
     "/assets/dollar.png",
   ]);
   base.colorSpace = THREE.SRGBColorSpace;
-  dollar.colorSpace = THREE.SRGBColorSpace;
+  bill.colorSpace = THREE.SRGBColorSpace;
   env.colorSpace = THREE.SRGBColorSpace;
   normal.colorSpace = THREE.NoColorSpace;
   env.wrapS = env.wrapT = THREE.RepeatWrapping;
+  // uBill needs no wrap mode: the fragment shader clamps its UV, so parallax runs off the
+  // edge of the print instead of wrapping a second Franklin into view.
 
   const uniforms = useMemo(
     () => ({
       uBase: { value: base },
       uNormal: { value: normal },
-      uDollar: { value: dollar },
+      uBill: { value: bill },
       uEnv: { value: env },
       uTime: { value: 0 },
       uReveal: { value: 0 },
+      uDollarMix: { value: dollarReveal },
       uReflStrength: { value: reflStrength },
       uVelocity: { value: 0 },
       uRotation: { value: new THREE.Vector2(0, 0) },
     }),
-    [base, normal, dollar, env], // eslint-disable-line react-hooks/exhaustive-deps
+    [base, normal, bill, env], // eslint-disable-line react-hooks/exhaustive-deps
   );
   uniforms.uReflStrength.value = reflStrength;
 
@@ -111,6 +159,79 @@ function LogoQuad({
   const dragging = useRef(false);
   const idleDir = useRef(1); // sign of the resting idle spin — follows the last flick
   const last = useRef({ x: 0, y: 0, t: 0 });
+  const scrollEnergy = useRef(0); // 0..1, normalised scroll speed; decays in useFrame
+  const hover = useRef(0); // eased 0..1 pointer proximity
+  const hoverTarget = useRef(0); // measured proximity, before easing
+  const hoverDir = useRef(new THREE.Vector2(0, 0)); // unit offset from centre to pointer
+  const canvasRect = useRef<DOMRect | null>(null);
+
+  // Pointer proximity drives both the reflection and a lean toward the cursor. The rect is
+  // cached and refreshed on resize/scroll rather than measured inside the move handler —
+  // getBoundingClientRect there would force a layout on every mouse move.
+  useEffect(() => {
+    const el = gl.domElement;
+    const measure = () => {
+      canvasRect.current = el.getBoundingClientRect();
+    };
+    measure();
+
+    const onMove = (e: PointerEvent) => {
+      const r = canvasRect.current;
+      if (!r || r.width === 0 || r.height === 0) return;
+      const halfW = r.width / 2;
+      const halfH = r.height / 2;
+      const nx = (e.clientX - (r.left + halfW)) / halfW;
+      const ny = (e.clientY - (r.top + halfH)) / halfH;
+      const dist = Math.hypot(nx, ny);
+      hoverTarget.current = 1 - THREE.MathUtils.smoothstep(dist, HOVER_NEAR, HOVER_FAR);
+      const len = Math.max(dist, 1e-3);
+      hoverDir.current.set(nx / len, ny / len);
+    };
+    const onLeave = () => {
+      hoverTarget.current = 0;
+    };
+
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, { passive: true });
+    document.addEventListener("pointerleave", onLeave);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure);
+      document.removeEventListener("pointerleave", onLeave);
+    };
+  }, [gl]);
+
+  // YXZ so the Z spin is applied first, about the plate's own normal, and the X/Y tilt then
+  // turns that spinning plate in view space. Default XYZ order would let the tilt drag the
+  // spin axis around with it and the turn would read as a wobble instead of a rotation.
+  useEffect(() => {
+    if (meshRef.current) meshRef.current.rotation.order = "YXZ";
+  }, []);
+
+  // Page scroll is a second driver for the reflection, so the dollar reads on the way down
+  // the page and not only on drag. Attack is instant (take the peak), release is the
+  // SCROLL_DECAY falloff in useFrame. Off under reduced motion — CLAUDE.md forbids
+  // auto-sheen there, and the logo stays draggable regardless.
+  useEffect(() => {
+    if (reducedMotion) return;
+    let lastY = window.scrollY;
+    let lastT = performance.now();
+
+    const onScroll = () => {
+      const now = performance.now();
+      const dt = Math.max(16, now - lastT) / 1000;
+      const dy = window.scrollY - lastY;
+      lastY = window.scrollY;
+      lastT = now;
+      const norm = Math.min(1, Math.abs(dy) / dt / SCROLL_REF);
+      scrollEnergy.current = Math.max(scrollEnergy.current, norm);
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [reducedMotion]);
 
   useEffect(() => {
     const el = gl.domElement;
@@ -190,19 +311,60 @@ function LogoQuad({
     tilt.current.x = THREE.MathUtils.clamp(tilt.current.x, -maxTilt, maxTilt);
     tilt.current.y = THREE.MathUtils.clamp(tilt.current.y, -maxTilt, maxTilt);
 
+    // The reflection answers to whichever is stronger right now: the spin physics or the
+    // page scroll. Both feed the same band sweep + sheen bloom, so a scroll reads like a
+    // flick rather than as a separate effect.
+    if (!reducedMotion) scrollEnergy.current *= Math.pow(SCROLL_DECAY, f);
+    const scrollDrive = reducedMotion ? 0 : scrollEnergy.current * scrollReveal;
+
+    // restReveal is the floor: the idle turn is only ~0.1 rad/s, so speed alone leaves the
+    // reveal near zero and the facets have nothing to catch. Holding it at rest keeps the
+    // reflection live through the whole rotation; drag and scroll bloom above it.
     const speed = Math.abs(spinVel.current);
-    const targetReveal = Math.min(1, speed * 0.4);
+    const targetReveal = Math.min(1, Math.max(restReveal, speed * 0.4, scrollDrive));
+    const targetVel = Math.min(1, Math.max(speed * 0.5, scrollDrive));
     if (reducedMotion) {
-      vel.current = Math.min(1, speed * 0.5);
+      vel.current = targetVel;
       reveal.current = targetReveal;
     } else {
-      vel.current += (Math.min(1, speed * 0.5) - vel.current) * 0.15;
+      vel.current += (targetVel - vel.current) * 0.15;
       reveal.current += (targetReveal - reveal.current) * Math.min(1, dt * 5);
     }
 
-    if (meshRef.current) meshRef.current.rotation.z = BASE_ROTATION + spin.current;
+    // Resting wobble on both tilt axes, so the plate keeps reading as a solid object even
+    // when nobody is touching it — a pure Z spin is what made it look like a flat disc.
+    // Amplitude is a fraction of tiltClamp and the sum below is re-clamped, so drag plus
+    // wobble can still never approach edge-on, where a backless plate would vanish.
+    const t = reducedMotion ? 0 : state.clock.elapsedTime;
+    const wobble = reducedMotion ? 0 : maxTilt * idleTilt;
+    const idleX = Math.sin(t * IDLE_TILT_SPEED) * wobble;
+    const idleY = Math.cos(t * IDLE_TILT_SPEED * IDLE_TILT_RATIO) * wobble * 0.7;
+
+    // Ease the measured proximity so the plate arrives at the cursor rather than snapping.
+    hover.current += (hoverTarget.current - hover.current) * Math.min(1, dt * HOVER_EASE);
+
+    // Lean toward the cursor. Negated on Y so the edge nearest the pointer swings forward
+    // rather than away, which is what reads as the plate turning to face it.
+    const lean = maxTilt * hoverLean * hover.current;
+    const hoverX = hoverDir.current.y * lean;
+    const hoverY = -hoverDir.current.x * lean;
+
+    // Vertical drag tips around X, horizontal drag turns around Y.
+    const tiltX = THREE.MathUtils.clamp(tilt.current.y + idleX + hoverX, -maxTilt, maxTilt);
+    const tiltY = THREE.MathUtils.clamp(tilt.current.x + idleY + hoverY, -maxTilt, maxTilt);
+
+    if (meshRef.current) {
+      meshRef.current.rotation.set(tiltX, tiltY, BASE_ROTATION + spin.current);
+    }
     uniforms.uRotation.value.set(spin.current + tilt.current.x, tilt.current.y);
     uniforms.uReveal.value = reveal.current;
+    // How far the user has actually turned the plate off-axis, 0..1. Read off the drag tilt
+    // alone, not the composed tiltX/tiltY: those carry the idle wobble, which never stops,
+    // so the note would sit permanently half-revealed instead of answering the turn.
+    const turn = Math.min(1, Math.hypot(tilt.current.x, tilt.current.y) / maxTilt);
+    // Proximity or turn gates the portrait, whichever is stronger: plain cyan glass at rest,
+    // the note surfacing as the cursor nears or as the plate is turned to its side.
+    uniforms.uDollarMix.value = dollarReveal * Math.max(hover.current, turn);
     uniforms.uVelocity.value = vel.current;
     uniforms.uTime.value = reducedMotion ? 0 : state.clock.elapsedTime;
 
@@ -288,13 +450,18 @@ export default function GlossyLogo(props: GlossyLogoProps) {
           style={{ width: "100%", height: "100%" }}
           aria-hidden="true"
         >
-          <OrthographicCamera makeDefault position={[0, 0, 5]} />
+          <PerspectiveCamera makeDefault fov={FOV} position={[0, 0, 5]} />
           <FitCamera />
           <LogoQuad
             reflStrength={settings.reflStrength}
             inertiaDecay={settings.inertiaDecay}
             tiltClamp={settings.tiltClamp}
             idleSpeed={settings.idleSpeed}
+            scrollReveal={settings.scrollReveal}
+            idleTilt={settings.idleTilt}
+            restReveal={settings.restReveal}
+            dollarReveal={settings.dollarReveal}
+            hoverLean={settings.hoverLean}
             reducedMotion={reduced}
             onReady={() => setPainted(true)}
           />
