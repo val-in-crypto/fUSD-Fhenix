@@ -106,28 +106,28 @@ export default function Hero() {
           dollar with <span className="font-serif italic">yield</span>
         </h1>
 
-        {/* Eyebrow block (top-right) */}
-        <p
-          className={`absolute ${MONO} uppercase`}
-          style={{
-            left: "calc(75% + 7px)",
-            top: "9.180%",
-            width: 209,
-            fontSize: 16,
-            letterSpacing: "-0.16px",
-            lineHeight: 1.1,
-          }}
-        >
-          Confidential by default — public when you want.
-        </p>
+        {/* Eyebrow block (top-right). The two lines share one anchor and stack in flow.
+            They used to carry separate percentage anchors, which does not hold once the
+            stage height is fluid: the type stays a fixed 16px while the anchors scale, so
+            the gap closed from 17px at the 1024 design height to 9px at 900 and the lines
+            overlapped below ~700. 17px is the Figma spacing — y=164 less the first block's
+            147px bottom — and now it holds at every stage height. */}
         <div
-          className="absolute flex items-center gap-1"
-          style={{ left: "calc(75% + 7px)", top: "16.016%", width: 199 }}
+          className="absolute flex flex-col"
+          style={{ left: "calc(75% + 7px)", top: "9.180%", gap: 17 }}
         >
-          <ArrowDown className="size-4 shrink-0 text-ink" style={{ transform: "rotate(90deg) scaleY(-1)" }} />
-          <p className={`${MONO} uppercase`} style={{ ...MONO_LABEL_STYLE, width: 202 }}>
-            One token, one toggle, two modes.
+          <p
+            className={`${MONO} uppercase`}
+            style={{ width: 209, fontSize: 16, letterSpacing: "-0.16px", lineHeight: 1.1 }}
+          >
+            Confidential by default — public when you want.
           </p>
+          <div className="flex items-center gap-1" style={{ width: 199 }}>
+            <ArrowDown className="size-4 shrink-0 text-ink" style={{ transform: "rotate(90deg) scaleY(-1)" }} />
+            <p className={`${MONO} uppercase`} style={{ ...MONO_LABEL_STYLE, width: 202 }}>
+              One token, one toggle, two modes.
+            </p>
+          </div>
         </div>
 
         {/* FHENIX nav mark (top-right corner) */}
