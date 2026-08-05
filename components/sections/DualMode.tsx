@@ -154,6 +154,13 @@ export default function DualMode() {
             {SUB}
           </p>
         </Reveal>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/assets/franklin-halftone.png"
+          alt=""
+          aria-hidden="true"
+          className="h-auto w-[150px] select-none"
+        />
         <div className="flex flex-col gap-5">
           {CARDS.map((c, i) => (
             <Reveal key={c.title} delay={MOTION.stagger * (i + 1)}>

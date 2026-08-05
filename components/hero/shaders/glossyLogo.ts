@@ -1,7 +1,7 @@
 // GLSL for the glossy fUSD logo. HYBRID reflection: cyan glass base (uBase) with the
 // pre-rendered dollar-glass art (uDollar) revealed by a rotation-driven sweep, plus a
 // fresnel edge, a matcap env sheen (uEnv = dollar bill), and a moving specular band.
-// Phase 4: static (uReveal/uRotation set by props). Phase 5 drives them from drag physics.
+// uReveal/uRotation are driven from the drag + idle-spin physics in GlossyLogo.tsx.
 
 export const vertexShader = /* glsl */ `
   varying vec2 vUv;

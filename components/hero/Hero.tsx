@@ -146,7 +146,8 @@ export default function Hero() {
           INTO STABLE VALUE
         </p>
 
-        <div className="absolute" style={{ left: 40, top: 920 }}>
+        {/* CTA — raised from Figma's y=820 to y=700 so it clears the fold on shorter viewports */}
+        <div className="absolute" style={{ left: 40, top: 700 }}>
           <WaitlistPill />
         </div>
 
@@ -155,8 +156,8 @@ export default function Hero() {
         </div>
       </div>
 
-      {/* ── Mobile reflow (< md) ─────────────────────────────────────────────── */}
-      <div className="relative flex min-h-[100svh] flex-col overflow-hidden px-6 py-8 md:hidden">
+      {/* ── Mobile reflow (< md) — compact stack matching Figma 136:2 ──────────── */}
+      <div className="relative flex flex-col overflow-hidden px-6 pb-12 pt-6 md:hidden">
         <Glows />
 
         <div className="relative flex items-center justify-between">
@@ -170,13 +171,13 @@ export default function Hero() {
         </div>
 
         <h1
-          className="relative mt-10 font-display text-ink"
-          style={{ fontSize: "clamp(40px, 13vw, 72px)", letterSpacing: "-0.4px", lineHeight: 0.92 }}
+          className="relative mt-7 font-display text-ink"
+          style={{ fontSize: "clamp(44px, 13vw, 72px)", letterSpacing: "-0.4px", lineHeight: 0.92 }}
         >
           The dual-mode dollar with <span className="font-serif italic">yield</span>
         </h1>
 
-        <div className="relative mt-6 flex flex-col gap-2">
+        <div className="relative mt-5 flex flex-col gap-2">
           <p className={`${MONO} uppercase`} style={{ fontSize: 14, letterSpacing: "-0.14px", lineHeight: 1.1 }}>
             Confidential by default — public when you want.
           </p>
@@ -188,13 +189,11 @@ export default function Hero() {
           </div>
         </div>
 
-        <div className="relative my-8 flex flex-1 items-center justify-center">
-          <div className="aspect-square w-[82%] max-w-[380px]">
-            <GlossyLogo />
-          </div>
+        <div className="relative mx-auto mt-4 aspect-square w-full max-w-[380px]">
+          <GlossyLogo />
         </div>
 
-        <div className="relative flex items-end justify-between">
+        <div className="relative mt-6 flex items-center justify-between">
           <WaitlistPill />
           <Socials />
         </div>

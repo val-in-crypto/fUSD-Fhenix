@@ -1,6 +1,7 @@
-// Decrypt transition: the cyan halftone "plate" (uFrom) resolves into the photographic
-// bill (uTo) in scattered cell-blocks as uProgress rises — confidential -> public.
-// Unresolved cells jitter per-cell (scrambled data); a cyan scan line rides the front.
+// Encrypt transition: the photographic bill (uPlain) dissolves INTO the cyan cipher plate
+// (uCipher) in scattered cell-blocks as uProgress rises — plaintext -> ciphertext, embodying
+// "your financial data becomes truly yours." Scrolling back up reverses it (decrypt).
+// Newly-encrypted cells jitter (scrambled data); a cyan scan line rides the encryption front.
 
 export const vertexShader = /* glsl */ `
   varying vec2 vUv;
@@ -13,12 +14,12 @@ export const vertexShader = /* glsl */ `
 export const fragmentShader = /* glsl */ `
   precision highp float;
 
-  uniform sampler2D uFrom;
-  uniform sampler2D uTo;
-  uniform float uProgress;   // 0 = fully encrypted, 1 = fully resolved
-  uniform float uScramble;   // 0 disables jitter + scan line (reduced motion)
-  uniform float uFromAspect;
-  uniform float uToAspect;
+  uniform sampler2D uPlain;    // photographic bill (plaintext, progress = 0)
+  uniform sampler2D uCipher;   // cyan halftone plate (ciphertext, progress = 1)
+  uniform float uProgress;     // 0 = fully plaintext, 1 = fully encrypted
+  uniform float uScramble;     // 0 disables jitter + scan line (reduced motion)
+  uniform float uPlainAspect;
+  uniform float uCipherAspect;
   uniform float uQuadAspect;
 
   varying vec2 vUv;
@@ -46,24 +47,24 @@ export const fragmentShader = /* glsl */ `
     vec2 cellId = floor(uv * cells);
     float rnd = hash(cellId);
 
-    // resolve front sweeps left -> right, scattered by per-cell randomness
+    // encryption front sweeps left -> right, scattered by per-cell randomness
     float threshold = uv.x * 0.55 + rnd * 0.45;
-    float resolved = smoothstep(threshold - 0.10, threshold + 0.10, uProgress);
+    float encrypted = smoothstep(threshold - 0.10, threshold + 0.10, uProgress);
 
-    // encrypted cells jitter; resolved cells sit still
+    // encrypted cells jitter (scrambled ciphertext); plaintext cells sit still
     vec2 jitter = (vec2(hash(cellId + 3.7), hash(cellId + 9.1)) - 0.5)
-                * 0.06 * (1.0 - resolved) * uScramble;
+                * 0.06 * encrypted * uScramble;
 
-    vec4 fromCol = texture2D(uFrom, coverUv(uv + jitter, uFromAspect));
-    vec4 toCol   = texture2D(uTo,   coverUv(uv, uToAspect));
+    vec4 plainCol  = texture2D(uPlain,  coverUv(uv, uPlainAspect));
+    vec4 cipherCol = texture2D(uCipher, coverUv(uv + jitter, uCipherAspect));
 
-    vec4 col = mix(fromCol, toCol, resolved);
+    vec4 col = mix(plainCol, cipherCol, encrypted);
 
-    // cyan scan line riding the resolve front, faded out at both ends so the
+    // cyan scan line riding the encryption front, faded out at both ends so the
     // finished plate is clean and the untouched plate isn't pre-lit
     float endsFade = smoothstep(0.0, 0.06, uProgress) * (1.0 - smoothstep(0.92, 1.0, uProgress));
     float front = (1.0 - smoothstep(0.0, 0.045, abs(threshold - uProgress))) * uScramble * endsFade;
-    float inShape = step(0.001, max(fromCol.a, toCol.a));
+    float inShape = step(0.001, max(plainCol.a, cipherCol.a));
     col.rgb += vec3(0.04, 0.85, 0.86) * front * 0.55 * inShape;
     col.a = max(col.a, front * 0.45 * inShape);
 

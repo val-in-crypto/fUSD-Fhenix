@@ -22,7 +22,9 @@ const SPIN_SENS = 0.01;
 const TILT_SENS_X = 0.002;
 const TILT_SENS_Y = 0.006;
 const TILT_DECAY = 0.9;
-const IDLE_AMP = 0.0006;
+// multiplier on idleSpeed -> resting angular velocity (rad/s); default 0.5*0.2 = 0.1 rad/s,
+// a full turn in ~63s (luxury-watch pace).
+const IDLE_VEL = 0.2;
 
 const FALLBACK_STYLE: React.CSSProperties = { transform: "rotate(-25.98deg)", opacity: 0.7 };
 
@@ -107,6 +109,7 @@ function LogoQuad({
   const reveal = useRef(0);
   const vel = useRef(0);
   const dragging = useRef(false);
+  const idleDir = useRef(1); // sign of the resting idle spin — follows the last flick
   const last = useRef({ x: 0, y: 0, t: 0 });
 
   useEffect(() => {
@@ -122,6 +125,7 @@ function LogoQuad({
       const dy = e.clientY - last.current.y;
       spin.current += dx * SPIN_SENS;
       spinVel.current = (dx * SPIN_SENS) / dt;
+      if (dx !== 0) idleDir.current = Math.sign(dx);
       tilt.current.x += dx * TILT_SENS_X;
       tilt.current.y += dy * TILT_SENS_Y;
       last.current.x = e.clientX;
@@ -166,13 +170,21 @@ function LogoQuad({
       if (reducedMotion) {
         spinVel.current = 0;
       } else {
-        spinVel.current *= Math.pow(inertiaDecay, f);
+        // Ease angular velocity toward a slow, continuous idle spin (luxury-watch pace) in
+        // the last-flicked direction. A flick blooms, then decays gently back to idle — no
+        // snap, no overshoot. In-plane (Z) spin only: the asterisk is a flat plate, so a
+        // Y-axis turn would send it edge-on and vanish (CLAUDE.md hard constraint).
+        const idleVel = idleSpeed * IDLE_VEL * idleDir.current;
+        spinVel.current = idleVel + (spinVel.current - idleVel) * Math.pow(inertiaDecay, f);
         spin.current += spinVel.current * dt;
         tilt.current.multiplyScalar(Math.pow(TILT_DECAY, f));
-        if (Math.abs(spinVel.current) < 0.06) {
-          spin.current += Math.sin(state.clock.elapsedTime * idleSpeed) * IDLE_AMP;
-        }
       }
+    }
+
+    // Keep spin 2π-periodic (visually seamless) so float precision holds over long idles.
+    if (!reducedMotion) {
+      const TWO_PI = Math.PI * 2;
+      spin.current = ((spin.current % TWO_PI) + TWO_PI) % TWO_PI;
     }
 
     tilt.current.x = THREE.MathUtils.clamp(tilt.current.x, -maxTilt, maxTilt);

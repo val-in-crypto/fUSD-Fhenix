@@ -8,8 +8,8 @@ import { useReducedMotion } from "@/components/motion/MotionProvider";
 import { useScrollProgress } from "@/components/motion/useScrollProgress";
 import { fragmentShader, vertexShader } from "./shaders/decryptDollar";
 
-const FROM_SRC = "/assets/dollar-engraved.png";
-const TO_SRC = "/assets/dollar.png";
+const PLAIN_SRC = "/assets/dollar.png"; // plaintext bill — progress 0
+const CIPHER_SRC = "/assets/dollar-engraved.png"; // cyan cipher plate — progress 1
 
 /** Remap raw travel-through-viewport into the window where the decrypt should play. */
 const START = 0.25;
@@ -39,24 +39,24 @@ type PlateProps = {
 function Plate({ progressRef, reduced, debugProgress, onReady }: PlateProps) {
   const { size } = useThree();
   const ready = useRef(false);
-  const [from, to] = useTexture([FROM_SRC, TO_SRC]);
-  from.colorSpace = THREE.SRGBColorSpace;
-  to.colorSpace = THREE.SRGBColorSpace;
+  const [plain, cipher] = useTexture([PLAIN_SRC, CIPHER_SRC]);
+  plain.colorSpace = THREE.SRGBColorSpace;
+  cipher.colorSpace = THREE.SRGBColorSpace;
 
-  const fromImg = from.image as { width: number; height: number };
-  const toImg = to.image as { width: number; height: number };
+  const plainImg = plain.image as { width: number; height: number };
+  const cipherImg = cipher.image as { width: number; height: number };
 
   const uniforms = useMemo(
     () => ({
-      uFrom: { value: from },
-      uTo: { value: to },
+      uPlain: { value: plain },
+      uCipher: { value: cipher },
       uProgress: { value: 0 },
       uScramble: { value: reduced ? 0 : 1 },
-      uFromAspect: { value: fromImg.width / fromImg.height },
-      uToAspect: { value: toImg.width / toImg.height },
+      uPlainAspect: { value: plainImg.width / plainImg.height },
+      uCipherAspect: { value: cipherImg.width / cipherImg.height },
       uQuadAspect: { value: 1 },
     }),
-    [from, to], // eslint-disable-line react-hooks/exhaustive-deps
+    [plain, cipher], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   uniforms.uScramble.value = reduced ? 0 : 1;
@@ -142,14 +142,14 @@ export default function DecryptDollar({ debugProgress }: { debugProgress?: numbe
       ref={ref}
       className="relative h-full w-full"
       role="img"
-      aria-label="A one hundred dollar bill, resolving from an encrypted halftone plate"
+      aria-label="A one hundred dollar bill dissolving into an encrypted cyan cipher plate"
     >
-      {/* Resolved state as the static fallback: SSR content, load placeholder, no-WebGL.
+      {/* Plaintext bill as the static fallback: SSR content, load placeholder, no-WebGL.
           Accessible name is on the wrapper so it outlives this element. */}
       {!painted && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={TO_SRC}
+          src={PLAIN_SRC}
           alt=""
           aria-hidden="true"
           className="absolute inset-0 h-full w-full object-contain"
