@@ -54,8 +54,14 @@ function Logo({ className }: { className?: string }) {
 export default function Hero() {
   return (
     <section aria-label="fUSD hero" className="relative w-full overflow-hidden bg-[color:var(--bg)]">
-      {/* ── Desktop / fluid stage (>= md) — exact Figma 94:3 anchors ─────────── */}
-      <div className="relative mx-auto hidden h-[1024px] w-full max-w-[1440px] md:block">
+      {/* ── Desktop / fluid stage (>= md) — exact Figma 94:3 anchors ───────────
+          Stage height tracks the viewport so the hero never runs into the section
+          below, and caps at the Figma stage height so it does not stretch on tall
+          displays. Every vertical anchor below is therefore a percentage of the
+          1024px design height rather than a frozen pixel — same coordinates, but
+          they follow the stage. dvh, not vh, so mobile browser chrome collapsing
+          does not leave the fold mid-composition. */}
+      <div className="relative mx-auto hidden h-[min(100dvh,1024px)] w-full max-w-[1440px] md:block">
         <Glows />
 
         <div className="absolute top-0 h-full w-px bg-hairline" style={{ left: "calc(25% + 17px)" }} />
@@ -73,13 +79,13 @@ export default function Hero() {
         {/* Interactive glossy logo */}
         <div
           className="absolute"
-          style={{ left: "calc(8.33% + 45px)", top: 75, width: 1082, height: 980 }}
+          style={{ left: "calc(8.33% + 45px)", top: "7.324%", width: 1082, height: "95.703%" }}
         >
           <GlossyLogo />
         </div>
 
         {/* ◐USD lockup */}
-        <div className="absolute" style={{ left: 39, top: 26 }}>
+        <div className="absolute" style={{ left: 39, top: "2.539%" }}>
           <Logo />
         </div>
 
@@ -88,7 +94,7 @@ export default function Hero() {
           className="absolute font-display text-ink"
           style={{
             left: 40,
-            top: 94,
+            top: "9.180%",
             width: 564,
             fontSize: 80,
             letterSpacing: "-0.8px",
@@ -105,7 +111,7 @@ export default function Hero() {
           className={`absolute ${MONO} uppercase`}
           style={{
             left: "calc(75% + 7px)",
-            top: 94,
+            top: "9.180%",
             width: 209,
             fontSize: 16,
             letterSpacing: "-0.16px",
@@ -116,7 +122,7 @@ export default function Hero() {
         </p>
         <div
           className="absolute flex items-center gap-1"
-          style={{ left: "calc(75% + 7px)", top: 164, width: 199 }}
+          style={{ left: "calc(75% + 7px)", top: "16.016%", width: 199 }}
         >
           <ArrowDown className="size-4 shrink-0 text-ink" style={{ transform: "rotate(90deg) scaleY(-1)" }} />
           <p className={`${MONO} uppercase`} style={{ ...MONO_LABEL_STYLE, width: 202 }}>
@@ -125,7 +131,7 @@ export default function Hero() {
         </div>
 
         {/* FHENIX nav mark (top-right corner) */}
-        <div className="absolute flex items-center gap-2" style={{ left: "calc(91.67% - 5px)", top: 30 }}>
+        <div className="absolute flex items-center gap-2" style={{ left: "calc(91.67% - 5px)", top: "2.930%" }}>
           <ArrowEnter className="size-5 shrink-0 text-black" style={{ transform: "scaleY(-1) rotate(180deg)" }} />
           <span className="font-mono font-medium whitespace-nowrap text-black" style={MONO_LABEL_STYLE}>
             FHENIX
@@ -135,29 +141,32 @@ export default function Hero() {
         {/* Mid-line micro-labels */}
         <p
           className={`absolute ${MONO} whitespace-nowrap`}
-          style={{ left: "calc(8.33% + 91px)", top: 502, ...MONO_LABEL_STYLE }}
+          style={{ left: "calc(8.33% + 91px)", top: "49.023%", ...MONO_LABEL_STYLE }}
         >
           WE TURN PRIVACY
         </p>
         <p
           className={`absolute ${MONO} whitespace-nowrap`}
-          style={{ left: "calc(75% + 7px)", top: 502, ...MONO_LABEL_STYLE }}
+          style={{ left: "calc(75% + 7px)", top: "49.023%", ...MONO_LABEL_STYLE }}
         >
           INTO STABLE VALUE
         </p>
 
         {/* CTA — raised from Figma's y=820 to y=700 so it clears the fold on shorter viewports */}
-        <div className="absolute" style={{ left: 40, top: 700 }}>
+        <div className="absolute" style={{ left: 40, top: "68.359%" }}>
           <WaitlistPill />
         </div>
 
-        <div className="absolute" style={{ left: 1345, top: 936 }}>
+        <div className="absolute" style={{ left: 1345, top: "91.406%" }}>
           <Socials />
         </div>
       </div>
 
-      {/* ── Mobile reflow (< md) — compact stack matching Figma 136:2 ──────────── */}
-      <div className="relative flex flex-col overflow-hidden px-6 pb-12 pt-6 md:hidden">
+      {/* ── Mobile reflow (< md) — compact stack matching Figma 136:2 ────────────
+          Pinned to one screen. The type and CTA keep their intrinsic heights and the
+          logo takes whatever is left (flex-1), so the stack fits every phone instead
+          of pushing the CTA past the fold on short ones. */}
+      <div className="relative flex h-[100dvh] flex-col overflow-hidden px-6 pb-12 pt-6 md:hidden">
         <Glows />
 
         <div className="relative flex items-center justify-between">
@@ -189,7 +198,9 @@ export default function Hero() {
           </div>
         </div>
 
-        <div className="relative mx-auto mt-4 aspect-square w-full max-w-[380px]">
+        {/* min-h-0 is load-bearing: a flex item's default min-height:auto would let the
+            canvas's intrinsic size win and push the CTA back off the screen. */}
+        <div className="relative mx-auto mt-4 w-full max-w-[380px] flex-1 min-h-0">
           <GlossyLogo />
         </div>
 
