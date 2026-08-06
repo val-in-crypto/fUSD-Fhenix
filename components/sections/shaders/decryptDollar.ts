@@ -60,8 +60,10 @@ export const fragmentShader = /* glsl */ `
   void main() {
     vec2 uv = vUv;
 
-    // block grid roughly matching the bill's proportions
-    vec2 cells = vec2(56.0, 24.0);
+    // Block grid, roughly matching the bill's proportions. Fine enough to read as data
+    // rather than as a broken JPEG — at 56x24 the cells were ~11px on the desktop stage,
+    // big enough that each one showed recognisable photograph.
+    vec2 cells = vec2(112.0, 48.0);
     vec2 cellId = floor(uv * cells);
     float rnd = hash(cellId);
 
@@ -81,11 +83,21 @@ export const fragmentShader = /* glsl */ `
     // and, at 0.06 of a 1220px texture (~73px), dragged transparent regions in and opaque
     // ones out, scattering detached blocks beyond the bill's own silhouette.
     float flipping = encrypted * (1.0 - encrypted) * 4.0;
+    // Amplitude tracks the cell size. At 0.03 (~37px of a 1220px plate) the throw was
+    // several cells wide once the grid halved, which turns a scramble into noise.
     vec2 jitter = (vec2(hash(cellId + 3.7), hash(cellId + 9.1)) - 0.5)
-                * 0.03 * flipping * uScramble;
+                * 0.015 * flipping * uScramble;
 
     vec4 plainCol  = texture2D(uPlain,  coverUv(uv));
-    vec4 cipherCol = texture2D(uCipher, unrotate(coverUv(uv + jitter), uCipherAspect, CIPHER_TILT));
+
+    // Un-rotating walks the sample off the top of the plate along the leading corner. The
+    // texture clamps to edge, so that row repeated across the width as a hard streak — the
+    // line along the top. Drop the cipher wherever the rotated coordinate leaves the plate
+    // and let the plain bill stand alone there, which is its transparent margin anyway.
+    vec2 cipherUv = unrotate(coverUv(uv + jitter), uCipherAspect, CIPHER_TILT);
+    vec2 inside = step(vec2(0.0), cipherUv) * step(cipherUv, vec2(1.0));
+    vec4 cipherCol = texture2D(uCipher, cipherUv);
+    cipherCol.a *= inside.x * inside.y;
 
     // Composite premultiplied. Mixing straight RGBA is wrong wherever the two plates
     // disagree on alpha: the transparent plate still carries RGB (black in both sources),
