@@ -17,6 +17,7 @@ export const fragmentShader = /* glsl */ `
   uniform sampler2D uPlain;    // photographic bill (plaintext, progress = 0)
   uniform sampler2D uCipher;   // cyan halftone plate (ciphertext, progress = 1)
   uniform float uProgress;     // 0 = fully plaintext, 1 = fully encrypted
+  uniform float uSpeed;        // |d(progress)/dt|, per second — widens the front when scrubbing
   uniform float uScramble;     // 0 disables jitter + scan line (reduced motion)
   uniform float uPlainAspect;
   uniform float uCipherAspect;
@@ -63,7 +64,14 @@ export const fragmentShader = /* glsl */ `
     // cyan scan line riding the encryption front, faded out at both ends so the
     // finished plate is clean and the untouched plate isn't pre-lit
     float endsFade = smoothstep(0.0, 0.06, uProgress) * (1.0 - smoothstep(0.92, 1.0, uProgress));
-    float front = (1.0 - smoothstep(0.0, 0.045, abs(threshold - uProgress))) * uScramble * endsFade;
+    // The band has to cover at least the ground the front makes in one frame, or a scrub
+    // steps clean over it and the line strobes instead of sweeping. At rest it stays the
+    // designed 0.045 hairline; under a fast flick it opens up and reads as motion blur.
+    float band = clamp(0.045 + uSpeed * 0.12, 0.045, 0.30);
+    float front = (1.0 - smoothstep(0.0, band, abs(threshold - uProgress))) * uScramble * endsFade;
+    // Dim it as it widens so a fast scroll does not flash a thick slab of cyan across the
+    // plate. sqrt rather than a straight 0.045/band, which would fade it to nothing.
+    front *= sqrt(0.045 / band);
     float inShape = step(0.001, max(plainCol.a, cipherCol.a));
     col.rgb += vec3(0.04, 0.85, 0.86) * front * 0.55 * inShape;
     col.a = max(col.a, front * 0.45 * inShape);
