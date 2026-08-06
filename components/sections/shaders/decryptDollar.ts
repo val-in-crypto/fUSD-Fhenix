@@ -29,6 +29,19 @@ export const fragmentShader = /* glsl */ `
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
   }
 
+  // The cipher plate was exported with its bill rotated ~3.7deg inside the frame: its ink
+  // edges run from y=4 at x=60 to y=35 at x=540 on a 600px-wide sample, top and bottom
+  // sloping alike. The plain bill is dead level. Undo the rotation when sampling so the two
+  // read as the same note being encrypted rather than two notes at different angles.
+  const float CIPHER_TILT = 0.0646; // radians, +3.7deg
+
+  vec2 unrotate(vec2 texUv, float aspect, float angle) {
+    vec2 p = (texUv - 0.5) * vec2(aspect, 1.0); // into square space, or the turn skews
+    float s = sin(angle), c = cos(angle);
+    p = mat2(c, -s, s, c) * p;
+    return p / vec2(aspect, 1.0) + 0.5;
+  }
+
   // "cover" fit so neither plate is distorted by the quad's aspect
   vec2 coverScale(float texAspect, float quadAspect) {
     return texAspect > quadAspect
@@ -72,7 +85,7 @@ export const fragmentShader = /* glsl */ `
                 * 0.03 * flipping * uScramble;
 
     vec4 plainCol  = texture2D(uPlain,  coverUv(uv));
-    vec4 cipherCol = texture2D(uCipher, coverUv(uv + jitter));
+    vec4 cipherCol = texture2D(uCipher, unrotate(coverUv(uv + jitter), uCipherAspect, CIPHER_TILT));
 
     // Composite premultiplied. Mixing straight RGBA is wrong wherever the two plates
     // disagree on alpha: the transparent plate still carries RGB (black in both sources),
