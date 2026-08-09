@@ -29,8 +29,8 @@ function Glows() {
           top is y=163). Staying flat exploits that: this reaches 704px across but only 317px
           down, which covers "yield" while passing over the asterisk's shoulder.
           Scanned across the art's true extent (its 234px radius, not the corners of its box,
-          which an asterisk leaves empty) the most it picks up is 0.25, and only right at the
-          outer rim where the arm tips sweep. The headline peaks at 0.50.
+          which an asterisk leaves empty) the most it picks up is 0.20, and only right at the
+          outer rim where the arm tips sweep. The headline peaks at 0.40.
           Dialled back by the stops rather than the radii — the ellipse has to stay this wide
           to reach the end of the headline at all, so taking the strength down is what makes
           it lighter without dropping "yield" back out of the wash.
@@ -42,8 +42,8 @@ function Glows() {
         style={{
           background:
             "radial-gradient(33% 27% at 21% 16%, " +
-            "color-mix(in srgb, var(--glow-cyan) 50%, transparent) 0%, " +
-            "color-mix(in srgb, var(--glow-cyan) 38%, transparent) 74%, " +
+            "color-mix(in srgb, var(--glow-cyan) 40%, transparent) 0%, " +
+            "color-mix(in srgb, var(--glow-cyan) 30%, transparent) 74%, " +
             "transparent 100%)",
         }}
       />
