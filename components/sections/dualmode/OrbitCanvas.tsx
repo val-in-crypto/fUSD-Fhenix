@@ -81,16 +81,41 @@ export default function OrbitCanvas({
     // blit. Sized for the largest a coin ever gets (BASE_COIN x max sizeVar x max frontness)
     // at the dpr cap, so they are never upscaled.
     const SPRITE_H = Math.round(BASE_COIN * 1.5 * 2);
-    const sprites: ({ canvas: HTMLCanvasElement; aspect: number } | undefined)[] = [];
+    // Blur ladder, in sprite-space px, baked once per coin. Doing it here rather than with
+    // ctx.filter in the loop is the whole point: filter applies per draw call, so blurring
+    // live would put a real gaussian on eighty draws a frame. Picking a pre-blurred sprite
+    // costs nothing. Five steps is enough that the change tracks the spiral without the
+    // jumps between them reading, given the coins are also accelerating and fading by then.
+    const BLUR_STEPS = [0, 1.5, 3.5, 6, 9];
+    // Room for the blur to spread into instead of clipping at the sprite's edge.
+    const BLUR_PAD = 14;
+
+    type Sprite = { levels: HTMLCanvasElement[]; aspect: number; padScale: number };
+    const sprites: (Sprite | undefined)[] = [];
 
     const bake = (im: HTMLImageElement, idx: number) => {
       if (!im.complete || im.naturalWidth === 0) return;
-      const aspect = im.naturalWidth / im.naturalHeight;
-      const off = document.createElement("canvas");
-      off.width = Math.max(1, Math.round(SPRITE_H * aspect));
-      off.height = SPRITE_H;
-      off.getContext("2d")?.drawImage(im, 0, 0, off.width, off.height);
-      sprites[idx] = { canvas: off, aspect };
+      const a = im.naturalWidth / im.naturalHeight;
+      const w = Math.max(1, Math.round(SPRITE_H * a));
+      const h = SPRITE_H;
+      const levels = BLUR_STEPS.map((blur) => {
+        const off = document.createElement("canvas");
+        off.width = w + BLUR_PAD * 2;
+        off.height = h + BLUR_PAD * 2;
+        const c2 = off.getContext("2d");
+        if (!c2) return off;
+        // Unsupported filter is simply ignored, which degrades to an unblurred coin.
+        if (blur > 0) c2.filter = `blur(${blur}px)`;
+        c2.drawImage(im, BLUR_PAD, BLUR_PAD, w, h);
+        return off;
+      });
+      sprites[idx] = {
+        levels,
+        // Of the padded canvas, not the coin — the padding has to be drawn to scale or the
+        // blur would be squeezed back into the coin's own footprint.
+        aspect: (w + BLUR_PAD * 2) / (h + BLUR_PAD * 2),
+        padScale: (h + BLUR_PAD * 2) / h,
+      };
     };
 
     COIN_SRCS.forEach((src, idx) => {
@@ -214,11 +239,19 @@ export default function OrbitCanvas({
         }
         order.sort(byFront);
 
+        // Blur tracks the spiral, so the coins are crisp while they orbit and smear into a
+        // soft mass as they compress — which is what lets them dissolve into the token
+        // instead of eighty hard edges vanishing under it.
+        const blurIdx = Math.min(
+          BLUR_STEPS.length - 1,
+          Math.round(spiral * (BLUR_STEPS.length - 1)),
+        );
+
         for (let k = 0; k < count; k++) {
           const i = order[k];
           const sprite = sprites[coins[i].img];
           if (!sprite) continue;
-          const dh = BASE_COIN * oScale[i];
+          const dh = BASE_COIN * oScale[i] * sprite.padScale;
           const dw = dh * sprite.aspect;
           const rot = coins[i].selfRot;
           const cos = Math.cos(rot);
@@ -228,7 +261,7 @@ export default function OrbitCanvas({
           // pairs a frame is the other half of the cost — each one snapshots the whole 2D
           // state, and none of it needs preserving between coins.
           ctx.setTransform(dpr * cos, dpr * sin, -dpr * sin, dpr * cos, dpr * oX[i], dpr * oY[i]);
-          ctx.drawImage(sprite.canvas, -dw / 2, -dh / 2, dw, dh);
+          ctx.drawImage(sprite.levels[blurIdx], -dw / 2, -dh / 2, dw, dh);
         }
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.globalAlpha = 1;
