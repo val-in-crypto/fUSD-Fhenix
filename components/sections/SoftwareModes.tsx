@@ -166,8 +166,12 @@ export default function SoftwareModes() {
         />
         <div className="relative flex flex-col items-center justify-center gap-10 text-center">
           <DissolveHeadline play={mobile.on} className="font-display text-ink" style={HEADLINE_MOBILE} />
+          {/* 0.72 of the Figma size on phones. At full size the switch is 148px wide, 38% of
+              a 390px screen and 46% of a 320px one, which crowds a section that also has to
+              hold the headline and the merged token. The scale bottoms out at a 49px tall
+              control, so it stays above the ~44px minimum touch target. */}
           <div ref={mobile.toggleRef}>
-            <ModeToggle on={mobile.on} onClick={mobile.toggle} />
+            <ModeToggle on={mobile.on} onClick={mobile.toggle} scale={0.72} />
           </div>
         </div>
       </div>
