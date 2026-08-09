@@ -133,15 +133,28 @@ export default function DualMode() {
           alt=""
           aria-hidden="true"
           className="pointer-events-none absolute select-none"
-          style={{ left: 1080, top: 0, width: 172, height: 258 }}
+          // 1440 - (1080 + 172) = 188 from the right edge; as a left offset it drifted
+          // toward the copy as the stage narrowed.
+          style={{ right: 188, top: 0, width: 172, height: 258 }}
         />
 
-        <div className="absolute" style={{ left: 40, top: 2993 - SECTION_TOP, width: 580 }}>
+        {/* The two cards as fractions of the 1440 frame rather than frozen px. At 40/820 with
+            a fixed 580 width the right-hand card overhung by 300px at 1100, and this section
+            does not clip, so that became horizontal scroll across the whole page. The pair
+            keeps its Figma proportions — 40.28% wide each, with the same 40px outer margins
+            and the 200px gutter between them scaling with the stage. */}
+        <div
+          className="absolute"
+          style={{ left: "2.778%", top: 2993 - SECTION_TOP, width: "40.278%" }}
+        >
           <Reveal delay={MOTION.stagger * 2}>
             <CompareCard card={CARDS[0]} absolute />
           </Reveal>
         </div>
-        <div className="absolute" style={{ left: 820, top: 2993 - SECTION_TOP, width: 580 }}>
+        <div
+          className="absolute"
+          style={{ left: "56.944%", top: 2993 - SECTION_TOP, width: "40.278%" }}
+        >
           <Reveal delay={MOTION.stagger * 3}>
             <CompareCard card={CARDS[1]} absolute />
           </Reveal>

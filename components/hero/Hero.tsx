@@ -88,15 +88,19 @@ export default function Hero() {
           className="absolute size-[10px] -translate-y-1/2 bg-ink-deep"
           style={{ left: 40, top: "calc(50% - 3px)" }}
         />
+        {/* Mirrors the left square's 40px margin. As calc(91.67% + 70px) it landed 40px in
+            from the right at 1440 but pushed past the edge on anything narrower. */}
         <div
           className="absolute size-[10px] -translate-y-1/2 bg-ink-deep"
-          style={{ left: "calc(91.67% + 70px)", top: "calc(50% - 3px)" }}
+          style={{ right: 40, top: "calc(50% - 3px)" }}
         />
 
         {/* Interactive glossy logo */}
         <div
           className="absolute"
-          style={{ left: "calc(8.33% + 45px)", top: "7.324%", width: 1082, height: "95.703%" }}
+          // Width as a fraction of the stage (1082/1440), not frozen px: below the 1440
+          // design width a fixed 1082 runs past the right edge — 119px of it at 1100.
+          style={{ left: "calc(8.33% + 45px)", top: "7.324%", width: "75.139%", height: "95.703%" }}
         >
           <GlossyLogo />
         </div>
@@ -129,26 +133,33 @@ export default function Hero() {
             the gap closed from 17px at the 1024 design height to 9px at 900 and the lines
             overlapped below ~700. 17px is the Figma spacing — y=164 less the first block's
             147px bottom — and now it holds at every stage height. */}
+        {/* Bounded on both edges rather than given a width. The Figma 209px is wider than the
+            right column has to give below ~950px — at 768 the column is 185px and the block
+            overhung the stage by 24. right:40 lets it take what the column has, maxWidth
+            holds it to the design where there is room. */}
         <div
           className="absolute flex flex-col"
-          style={{ left: "calc(75% + 7px)", top: "9.180%", gap: 17 }}
+          style={{ left: "calc(75% + 7px)", right: 40, maxWidth: 209, top: "9.180%", gap: 17 }}
         >
           <p
             className={`${MONO} uppercase`}
-            style={{ width: 209, fontSize: 16, letterSpacing: "-0.16px", lineHeight: 1.1 }}
+            style={{ fontSize: 16, letterSpacing: "-0.16px", lineHeight: 1.1 }}
           >
             Confidential by default — public when you want.
           </p>
-          <div className="flex items-center gap-1" style={{ width: 199 }}>
-            <ArrowDown className="size-4 shrink-0 text-ink" style={{ transform: "rotate(90deg) scaleY(-1)" }} />
-            <p className={`${MONO} uppercase`} style={{ ...MONO_LABEL_STYLE, width: 202 }}>
+          <div className="flex items-start gap-1">
+            <ArrowDown
+              className="size-4 shrink-0 text-ink"
+              style={{ transform: "rotate(90deg) scaleY(-1)" }}
+            />
+            <p className={`${MONO} uppercase`} style={MONO_LABEL_STYLE}>
               One token, one toggle, two modes.
             </p>
           </div>
         </div>
 
         {/* FHENIX nav mark (top-right corner) */}
-        <div className="absolute flex items-center gap-2" style={{ left: "calc(91.67% - 5px)", top: "2.930%" }}>
+        <div className="absolute flex items-center gap-2" style={{ right: 40, top: "2.930%" }}>
           <ArrowEnter className="size-5 shrink-0 text-black" style={{ transform: "scaleY(-1) rotate(180deg)" }} />
           <span className="font-mono font-medium whitespace-nowrap text-black" style={MONO_LABEL_STYLE}>
             FHENIX
@@ -190,7 +201,11 @@ export default function Hero() {
           </p>
         </div>
 
-        <div className="absolute" style={{ left: 1345, top: "91.406%" }}>
+        {/* Anchored from the right, not left:1345. That offset is 95px in from the 1440
+            frame's right edge, so as a left position it walked off-stage on anything
+            narrower — 255px off at 1100, which put the social links outside the hero's
+            overflow-hidden and made them disappear entirely. */}
+        <div className="absolute" style={{ right: 40, top: "91.406%" }}>
           <Socials />
         </div>
       </div>

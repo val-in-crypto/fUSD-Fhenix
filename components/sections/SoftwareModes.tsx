@@ -136,7 +136,7 @@ export default function SoftwareModes() {
         className="relative mx-auto hidden w-full max-w-[1440px] overflow-hidden md:block"
         style={{ height: 787 }}
       >
-        <Glow className="w-[1280px]" />
+        <Glow className="w-[88.9%]" />
         <OrbitCanvas
           count={80}
           on={desktop.on}

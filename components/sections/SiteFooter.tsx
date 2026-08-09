@@ -31,6 +31,17 @@ const LIVE_TEXT_STYLE = {
  */
 const LIVE_BASELINE_DROP = "-0.201em";
 
+/**
+ * Mobile size. The line cannot wrap, so on a narrow screen it has to be sized to the space
+ * rather than clamped to a floor: at 320 the old clamp's 40px minimum set 365px of text into
+ * 272px of usable width and the last word was clipped away by the footer's overflow.
+ *
+ * Measured, not guessed — this string sets 8.77x its font-size wide in Instrument Serif, so
+ * dividing the padded viewport by that ratio fits it exactly. Capped at the desktop 96px so
+ * it never overshoots the design on a wide phone.
+ */
+const LIVE_SIZE_MOBILE = "min(calc((100vw - 48px) / 8.77), 96px)";
+
 export default function SiteFooter() {
   return (
     <footer aria-label="Footer" className="relative w-full overflow-hidden bg-[color:var(--bg)]">
@@ -40,7 +51,9 @@ export default function SiteFooter() {
           <WaitlistPill />
         </div>
 
-        <div className="absolute" style={{ left: 1345, top: 36 }}>
+        {/* Anchored from the right — as left:1345 it sat 255px off-stage at 1100 and was
+            clipped away, so the social links vanished below the design width. */}
+        <div className="absolute" style={{ right: 40, top: 36 }}>
           <Socials />
         </div>
 
@@ -74,8 +87,8 @@ export default function SiteFooter() {
         <p
           className="font-serif uppercase whitespace-nowrap not-italic"
           style={{
-            fontSize: "clamp(40px, 13vw, 96px)",
-            letterSpacing: "-0.4px",
+            fontSize: LIVE_SIZE_MOBILE,
+            letterSpacing: "-0.01em",
             lineHeight: 1.1,
             marginBottom: LIVE_BASELINE_DROP,
           }}
