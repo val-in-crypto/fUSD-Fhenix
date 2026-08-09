@@ -13,9 +13,11 @@ import WaitlistPill from "@/components/ui/WaitlistPill";
 // the white footer but leaves one animatable property for the hover. Baking the alpha into
 // the stops instead would make the hover unanimatable — gradients do not interpolate, so it
 // could only snap between two images.
+// The middle stop comes through --live-mid, a registered custom property, so the hover can
+// run the Figma dark teal up to full cyan. See .live-headline in globals.css.
 const LIVE_TEXT_STYLE = {
   backgroundImage:
-    "linear-gradient(90deg, rgb(10,217,220) 0%, rgb(6,116,118) 52.885%, rgb(88,252,255) 100%)",
+    "linear-gradient(90deg, rgb(10,217,220) 0%, var(--live-mid) 52.885%, rgb(88,252,255) 100%)",
   WebkitBackgroundClip: "text",
   backgroundClip: "text",
   color: "transparent",
