@@ -35,6 +35,14 @@ export const fragmentShader = /* glsl */ `
   // read as the same note being encrypted rather than two notes at different angles.
   const float CIPHER_TILT = 0.0646; // radians, +3.7deg
 
+  // The two notes are also framed differently inside their own textures: the plain bill
+  // fills 0.995 x 0.900 of its frame, the cipher only 0.980 x 0.870. Matching the frames
+  // (aspect, rotation) is not enough while the notes sit at different sizes within them —
+  // their printed borders land ~3% apart, about 10px on the desktop stage, so the
+  // transition showed two edges rather than one. Magnify the cipher onto the plain bill:
+  // 0.995/0.980 across, 0.900/0.870 down.
+  const vec2 CIPHER_FIT = vec2(1.0153, 1.0345);
+
   vec2 unrotate(vec2 texUv, float aspect, float angle) {
     vec2 p = (texUv - 0.5) * vec2(aspect, 1.0); // into square space, or the turn skews
     float s = sin(angle), c = cos(angle);
@@ -71,11 +79,18 @@ export const fragmentShader = /* glsl */ `
     // directional term has to dominate the random one or there is no legible front at all —
     // at 0.55/0.45 the scatter was nearly as strong as the sweep, so cells all over the
     // plate flipped at once and it read as an image corrupting rather than a wipe crossing.
-    float threshold = uv.x * 0.78 + rnd * 0.22;
-    // Tight per-cell fade so a cell commits to plaintext or ciphertext quickly. The old
-    // 0.10 window left most of the band sitting half-mixed, which is what muddied the
-    // middle — two photographs averaged together at 50% look like neither.
-    float encrypted = smoothstep(threshold - 0.045, threshold + 0.045, uProgress);
+    // Sub-cell grain, finer than a cell, added to the threshold. Without it the threshold is
+    // constant down a cell's height, so vertically adjacent cells flip along a shared
+    // horizontal seam and the front reads as a staircase. The grain breaks those seams into
+    // stipple while leaving the block structure itself intact.
+    float grain = hash(floor(uv * cells * 4.0) + 31.7);
+    float threshold = uv.x * 0.78 + rnd * 0.19 + (grain - 0.5) * 0.06;
+
+    // Per-cell fade. Tight enough that a cell still commits to plaintext or ciphertext
+    // rather than sitting half-mixed — two photographs averaged at 50% look like neither —
+    // but wide enough that neighbours overlap as they flip instead of each snapping on its
+    // own and leaving a hard seam against the cell beside it.
+    float encrypted = smoothstep(threshold - 0.07, threshold + 0.07, uProgress);
 
     // Jitter peaks while a cell is mid-flip and settles to nothing once it has landed.
     // Scaling it by "encrypted" alone left finished cells permanently displaced, which is
@@ -90,24 +105,22 @@ export const fragmentShader = /* glsl */ `
 
     vec4 plainCol  = texture2D(uPlain,  coverUv(uv));
 
-    // Un-rotating walks the sample off the top of the plate along the leading corner. The
-    // texture clamps to edge, so that row repeated across the width as a hard streak — the
-    // line along the top. Drop the cipher wherever the rotated coordinate leaves the plate
-    // and let the plain bill stand alone there, which is its transparent margin anyway.
+    // Un-rotating walks the sample off the plate along the leading corner, where the
+    // sampler clamps and repeats its border row across the width. Fall back to the plain
+    // bill there so nothing streaks.
     vec2 cipherUv = unrotate(coverUv(uv + jitter), uCipherAspect, CIPHER_TILT);
+    cipherUv = (cipherUv - 0.5) / CIPHER_FIT + 0.5; // sit the cipher note on the plain one
     vec2 inside = step(vec2(0.0), cipherUv) * step(cipherUv, vec2(1.0));
-    vec4 cipherCol = texture2D(uCipher, cipherUv);
-    cipherCol.a *= inside.x * inside.y;
+    vec3 cipherRGB = mix(plainCol.rgb, texture2D(uCipher, cipherUv).rgb, inside.x * inside.y);
 
-    // Composite premultiplied. Mixing straight RGBA is wrong wherever the two plates
-    // disagree on alpha: the transparent plate still carries RGB (black in both sources),
-    // so a straight mix drags that toward the result and leaves grey and white blocks
-    // fringing the bill — including outside its own silhouette, where both are meant to
-    // be empty. Weighting each plate's colour by its own alpha and dividing back out
-    // keeps the colour of whichever plate is actually present.
-    float outA = mix(plainCol.a, cipherCol.a, encrypted);
-    vec3 outRGB = mix(plainCol.rgb * plainCol.a, cipherCol.rgb * cipherCol.a, encrypted);
-    vec4 col = vec4(outA > 0.001 ? outRGB / outA : vec3(0.0), outA);
+    // The plain bill's alpha is the only clean silhouette in play: a level, antialiased
+    // rectangle, constant across every column. The cipher plate has none at all — every one
+    // of its pixels is alpha 255, an opaque white background — so mixing the two alphas
+    // grew the shape outward into a full rectangle, cell by cell, as the front passed over
+    // the bill's transparent margins. The jitter then chewed that growing boundary into
+    // loose blocks. Gate on the plain silhouette instead: the bill keeps one clean edge the
+    // whole way through and only its contents dissolve.
+    vec4 col = vec4(mix(plainCol.rgb, cipherRGB, encrypted), plainCol.a);
 
     // cyan scan line riding the encryption front, faded out at both ends so the
     // finished plate is clean and the untouched plate isn't pre-lit
@@ -120,9 +133,11 @@ export const fragmentShader = /* glsl */ `
     // Dim it as it widens so a fast scroll does not flash a thick slab of cyan across the
     // plate. sqrt rather than a straight 0.045/band, which would fade it to nothing.
     front *= sqrt(0.045 / band);
-    float inShape = step(0.001, max(plainCol.a, cipherCol.a));
-    col.rgb += vec3(0.04, 0.85, 0.86) * front * 0.55 * inShape;
-    col.a = max(col.a, front * 0.45 * inShape);
+    // Tint only — the scan line used to contribute alpha of its own, over a shape taken
+    // from the cipher's useless all-255 alpha, so it painted a cyan bar across the full
+    // width of the quad and past the bill's edge. Colour added under the silhouette's own
+    // alpha stays inside the bill and fades out with its antialiased edge.
+    col.rgb += vec3(0.04, 0.85, 0.86) * front * 0.55;
 
     if (col.a < 0.005) discard;
     gl_FragColor = col;
