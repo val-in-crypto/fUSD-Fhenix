@@ -40,9 +40,8 @@ const CARDS: CompareCard[] = [
 function CompareCard({ card, absolute }: { card: CompareCard; absolute?: boolean }) {
   return (
     <div
-      className="relative overflow-hidden rounded-[24px] bg-white/10"
+      className="compare-card relative overflow-hidden rounded-[24px] bg-white/10"
       style={{
-        boxShadow: "0px 4px 4px 0px rgba(0,0,0,0.1)",
         height: absolute ? 294 : undefined,
         minHeight: absolute ? undefined : 260,
       }}
@@ -60,7 +59,7 @@ function CompareCard({ card, absolute }: { card: CompareCard; absolute?: boolean
           Built from --glow-cyan via color-mix so it tracks the token. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 select-none"
+        className="compare-card-glow pointer-events-none absolute inset-0 select-none"
         style={{
           background:
             "radial-gradient(70% 95% at 100% 100%, " +
