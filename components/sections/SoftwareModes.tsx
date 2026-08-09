@@ -156,14 +156,15 @@ export default function SoftwareModes() {
       </div>
 
       {/* ── Mobile ────────────────────────────────────────────────────────── */}
-      {/* Content sits at the bottom, not the top. It used to start straight after the top
-          padding and leave 282px of a 560px section empty underneath, while the token — which
-          has to fit above the toggle — was squeezed into the 181px left over. Pushing the
-          headline and toggle down hands that space to the token, which is the whole subject
-          of the section on a phone. */}
+      {/* Centred, so the headline sits in the middle of the coin field the way it does on
+          desktop. It was not centred before — the stage was not a flex column, so the content
+          just started after the top padding at y=80 and left 282px of a 560px section empty
+          underneath. That both pushed the copy above the coins and starved the token, which
+          has to fit above the toggle and had only 181px to do it in. Centring fixes both at
+          once without moving the copy out of the coins. */}
       <div
         ref={mobile.rootRef}
-        className="relative flex flex-col justify-end overflow-hidden px-6 pb-14 pt-10 md:hidden"
+        className="relative flex flex-col justify-center overflow-hidden px-6 py-16 md:hidden"
         style={{ minHeight: 560 }}
       >
         <Glow className="w-[760px]" />
