@@ -13,7 +13,20 @@ const COIN_SRCS = [
 ];
 const TOKEN_SRC = "/assets/hero-token.png";
 
-const BASE_COIN = 56; // px baseline coin height at depth 1
+const BASE_COIN = 56; // px baseline coin height at depth 1, at the reference canvas below
+
+/**
+ * The coins scale with the canvas. Held at a flat 56px they covered 11% of the 1440 desktop
+ * field but 35% of a 320px phone — the same field three times as crowded, with each coin
+ * going from 3.9% of the canvas width to 17.5% of it.
+ *
+ * Scaled on the square root of area, so coverage stays constant rather than the count
+ * thinning out: area is what crowding is measured in, and a linear scale would overshoot.
+ * The floor stops them shrinking into specks on the narrowest phones, where strict
+ * proportion would put them at 0.44 and cost more in legibility than it gains in space.
+ */
+const REF_AREA = 1440 * 787; // the desktop stage the 56px baseline was drawn for
+const COIN_SCALE_MIN = 0.55;
 const TOKEN_SIZE = 400; // px height of the formed hero token, at the desktop stage's size
 const TOKEN_HEADROOM = 16; // px kept clear above the token when the canvas forces it smaller
 const DURATION = 1.5; // seconds for a full OFF↔ON transition
@@ -216,6 +229,7 @@ export default function OrbitCanvas({
       const cy = h / 2;
       const rxMax = w * 0.46;
       const ryMax = h * 0.46;
+      const coinScale = Math.min(1, Math.max(COIN_SCALE_MIN, Math.sqrt((w * h) / REF_AREA)));
       const tokenBottom = mergeRef.current != null ? mergeRef.current : cy + TOKEN_SIZE / 2;
       // TOKEN_SIZE is the design value, taken off the 787px-tall desktop stage where there
       // happens to be room for it above the toggle. Mobile has far less: on a 390x560 canvas
@@ -268,7 +282,7 @@ export default function OrbitCanvas({
           const i = order[k];
           const sprite = sprites[coins[i].img];
           if (!sprite) continue;
-          const dh = BASE_COIN * oScale[i] * sprite.padScale;
+          const dh = BASE_COIN * coinScale * oScale[i] * sprite.padScale;
           const dw = dh * sprite.aspect;
           const rot = coins[i].selfRot;
           const cos = Math.cos(rot);
