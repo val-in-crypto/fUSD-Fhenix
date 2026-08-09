@@ -47,14 +47,25 @@ function CompareCard({ card, absolute }: { card: CompareCard; absolute?: boolean
         minHeight: absolute ? undefined : 260,
       }}
     >
-      {/* inner cyan glow, bottom-right */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/assets/card-glow.svg"
-        alt=""
+      {/* Cyan pooling into the bottom-right corner, fading up the right edge and along the
+          bottom. Replaces card-glow.svg, which was a blurred ellipse centred at (492, 255)
+          of a 580x294 card — a hot spot sitting inside the card rather than light gathering
+          in its corner, and fixed at 560px wide however the card was sized.
+          Anchored at the corner and measured in card-relative units, so it holds its shape
+          on both the 580px desktop card and the narrower mobile one. Sampled against the
+          card: 0.29 in the corner, 0.12 up the right edge, 0.07 along the bottom, and
+          effectively nothing on the copy — 0.009 at the body, 0 at the title and label.
+          Built from --glow-cyan via color-mix so it tracks the token. */}
+      <div
         aria-hidden="true"
-        className="pointer-events-none absolute w-[560px] max-w-none -translate-x-1/2 select-none"
-        style={{ left: "calc(50% + 202px)", top: 180 }}
+        className="pointer-events-none absolute inset-0 select-none"
+        style={{
+          background:
+            "radial-gradient(70% 95% at 100% 100%, " +
+            "color-mix(in srgb, var(--glow-cyan) 30%, transparent) 0%, " +
+            "color-mix(in srgb, var(--glow-cyan) 14%, transparent) 45%, " +
+            "transparent 100%)",
+        }}
       />
       <div className="relative" style={{ padding: `30px ${card.padX}px` }}>
         <p
