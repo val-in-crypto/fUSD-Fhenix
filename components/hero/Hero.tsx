@@ -25,10 +25,13 @@ function Glows() {
           top edge tints the whole masthead and flattens the asterisk's own glow into it.
           Centred on the headline and shaped like it — wide and shallow — rather than
           anchored in the corner. The headline is 564x119, so a corner-anchored radial cannot
-          reach its right end without also throwing cyan halfway down the page: the previous
-          one carried 0.29 alpha 400px below the copy and 0.22 well to its right. Centring on
-          the text instead covers all four of its corners at 0.25-0.37 and the logo at 0.34,
-          while 800px right falls to 0.005 and everything below the copy to zero.
+          reach its right end without also throwing cyan halfway down the page.
+          Tightening it is a matter of the stops as much as the radii: shrinking the ellipse
+          alone drops the far corner of the copy off the gradient. Holding most of the
+          strength out to 70% before the falloff starts keeps the text covered inside a
+          smaller footprint. Sampled against the live layout, the headline's four corners sit
+          at 0.22-0.44 and the logo at 0.42, while just right of the copy falls to 0.08 and
+          everything below it to zero.
           Built from --glow-cyan via color-mix so it tracks the token instead of freezing a
           second copy of the hex. */}
       <div
@@ -36,9 +39,9 @@ function Glows() {
         className="pointer-events-none absolute inset-0 select-none"
         style={{
           background:
-            "radial-gradient(40% 34% at 23% 17%, " +
-            "color-mix(in srgb, var(--glow-cyan) 52%, transparent) 0%, " +
-            "color-mix(in srgb, var(--glow-cyan) 34%, transparent) 60%, " +
+            "radial-gradient(34% 28% at 23% 17%, " +
+            "color-mix(in srgb, var(--glow-cyan) 56%, transparent) 0%, " +
+            "color-mix(in srgb, var(--glow-cyan) 42%, transparent) 70%, " +
             "transparent 100%)",
         }}
       />
