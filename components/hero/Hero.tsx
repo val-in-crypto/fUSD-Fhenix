@@ -21,12 +21,14 @@ const MONO_LABEL_STYLE = {
 function Glows() {
   return (
     <>
-      {/* Cyan wash behind the headline, and now the only light at the top of the stage.
-          glow-top.svg used to sit over this: a 1568px-wide blurred ellipse spanning -426 to
-          1142px of a 1280px stage, so it washed the full width and ran past both edges
-          regardless of how this one was tuned. It is dropped below — CLAUDE.md lists it as a
-          preserved motif (Figma 42:66), so restoring it is one element, but it cannot
-          coexist with a wash sized to the headline.
+      {/* Cyan wash behind the headline, and now the only light on the stage.
+          Both of the design's blurred-ellipse glows have been removed from the hero, and
+          CLAUDE.md lists both as preserved motifs (Figma 42:66 and 43:73), so this is a
+          deliberate departure from it — each is a single element to restore.
+          glow-top was a 1568px-wide ellipse spanning -426 to 1142px of a 1280px stage: it
+          washed the full width and ran past both edges regardless of how this wash was
+          tuned. glow-bottom was centred at (1039, 444), which put it directly over the
+          "Live on Arbitrum soon" line.
           Wide and shallow, so it spans the headline without reaching down into the asterisk.
           The two genuinely overlap — the art runs 458-927px across and the headline 40-604px
           — but only above y=213, where the headline ends and the art has barely begun (its
@@ -49,15 +51,6 @@ function Glows() {
             "color-mix(in srgb, var(--glow-cyan) 30%, transparent) 74%, " +
             "transparent 100%)",
         }}
-      />
-      {/* glow-bottom stays: it sits low and right, around the asterisk, and is the only
-          light on that side of the stage. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/assets/glow-bottom.svg"
-        alt=""
-        aria-hidden="true"
-        className="pointer-events-none absolute left-[81.2%] top-[61.6%] w-[988px] max-w-none -translate-x-1/2 -translate-y-1/2 select-none"
       />
     </>
   );
