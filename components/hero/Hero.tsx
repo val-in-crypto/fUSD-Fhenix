@@ -28,12 +28,14 @@ function Glows() {
           — but only above y=213, where the headline ends and the art has barely begun (its
           top is y=163). Staying flat exploits that: this reaches 704px across but only 317px
           down, which covers "yield" while passing over the asterisk's shoulder.
-          Scanned across the art's true extent (its 234px radius, not the corners of its box,
-          which an asterisk leaves empty) the most it picks up is 0.20, and only right at the
-          outer rim where the arm tips sweep. The headline peaks at 0.40.
-          Dialled back by the stops rather than the radii — the ellipse has to stay this wide
-          to reach the end of the headline at all, so taking the strength down is what makes
-          it lighter without dropping "yield" back out of the wash.
+          Reaches 653px, so it clears the asterisk's left edge at 458px in everything but the
+          rim: scanned across the art's true extent (its 234px radius, not the corners of its
+          box, which an asterisk leaves empty) the most it picks up is 0.12.
+          Trimmed from the right by the horizontal radius alone, with the centre following it
+          left, so "dual-mode" and the logo hold their level while the far end comes down.
+          That end is the whole tension in this thing — "yield" sits at 458-604px, physically
+          on top of the asterisk's box — so trimming right and covering "yield" are the same
+          dial pulled opposite ways. It now carries 0.14 falling to 0.01 across its width.
           Built from --glow-cyan via color-mix so it tracks the token instead of freezing a
           second copy of the hex. */}
       <div
@@ -41,7 +43,7 @@ function Glows() {
         className="pointer-events-none absolute inset-0 select-none"
         style={{
           background:
-            "radial-gradient(33% 27% at 21% 16%, " +
+            "radial-gradient(31% 27% at 20% 16%, " +
             "color-mix(in srgb, var(--glow-cyan) 40%, transparent) 0%, " +
             "color-mix(in srgb, var(--glow-cyan) 30%, transparent) 74%, " +
             "transparent 100%)",
