@@ -14,7 +14,8 @@ const COIN_SRCS = [
 const TOKEN_SRC = "/assets/hero-token.png";
 
 const BASE_COIN = 56; // px baseline coin height at depth 1
-const TOKEN_SIZE = 400; // px height of the formed hero token
+const TOKEN_SIZE = 400; // px height of the formed hero token, at the desktop stage's size
+const TOKEN_HEADROOM = 16; // px kept clear above the token when the canvas forces it smaller
 const DURATION = 1.5; // seconds for a full OFF↔ON transition
 
 /** Deterministic pseudo-random in [0,1) — no Math.random, so the field is identical every
@@ -187,9 +188,16 @@ export default function OrbitCanvas({
     });
     io.observe(canvas);
 
-    const drawToken = (cx: number, cy: number, scale: number, rot: number, alpha: number) => {
+    const drawToken = (
+      cx: number,
+      cy: number,
+      size: number,
+      scale: number,
+      rot: number,
+      alpha: number,
+    ) => {
       if (!tokenSprite || alpha <= 0) return;
-      const dh = TOKEN_SIZE * scale;
+      const dh = size * scale;
       const dw = dh * tokenSprite.aspect;
       const cos = Math.cos(rot);
       const sin = Math.sin(rot);
@@ -209,7 +217,16 @@ export default function OrbitCanvas({
       const rxMax = w * 0.46;
       const ryMax = h * 0.46;
       const tokenBottom = mergeRef.current != null ? mergeRef.current : cy + TOKEN_SIZE / 2;
-      const tokenCenterY = tokenBottom - TOKEN_SIZE / 2;
+      // TOKEN_SIZE is the design value, taken off the 787px-tall desktop stage where there
+      // happens to be room for it above the toggle. Mobile has far less: on a 390x560 canvas
+      // the merge line sits at y=181, so a fixed 400 put 219px of the token — 55% of it —
+      // above the top edge, and it was wider than the canvas besides. Fit it to whichever
+      // constraint actually binds. The floor keeps it from collapsing on a very short canvas.
+      const tokenSize = Math.max(
+        96,
+        Math.min(TOKEN_SIZE, w * 0.9, tokenBottom - TOKEN_HEADROOM),
+      );
+      const tokenCenterY = tokenBottom - tokenSize / 2;
 
       // These two overlap deliberately, 0.58 to 0.70. They used to be disjoint — the spiral
       // finished at 0.60 and the token only began at 0.66 — leaving a beat where the coins
@@ -278,7 +295,7 @@ export default function OrbitCanvas({
           floatY += -6 * Math.sin(ph); //  +6→−6→+6px
           rot += ((2 * Math.PI) / 180) * Math.sin(ph); // −2°→2°→−2°
         }
-        drawToken(cx, tokenCenterY + floatY, scale, rot, tok);
+        drawToken(cx, tokenCenterY + floatY, tokenSize, scale, rot, tok);
       }
     };
 
