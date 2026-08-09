@@ -23,14 +23,16 @@ function Glows() {
     <>
       {/* Cyan wash behind the headline. Local to this corner on purpose — spanning the full
           top edge tints the whole masthead and flattens the asterisk's own glow into it.
-          Bounded by the asterisk, which is the binding constraint here. The visible art runs
-          458-927px of a 1280px stage while the headline runs 40-604px, so the two overlap by
-          146px and no single gradient can cover the whole headline and still clear the logo.
-          Clearing the logo wins: this reaches 448px, ten short of the art, measured to zero
-          on every probe across it. The earlier version sat at 0.44 alpha on its upper arm.
-          The cost is that the last word of the headline sits outside the wash.
-          Holding most of the strength out to 72% before the falloff keeps the copy that IS
-          inside it evenly lit rather than fading across its own width.
+          Wide and shallow, so it spans the headline without reaching down into the asterisk.
+          The two genuinely overlap — the art runs 458-927px across and the headline 40-604px
+          — but only above y=213, where the headline ends and the art has barely begun (its
+          top is y=163). Staying flat exploits that: this reaches 704px across but only 317px
+          down, which covers "yield" while passing over the asterisk's shoulder.
+          Scanned across the art's true extent (its 234px radius, not the corners of its box,
+          which an asterisk leaves empty) the most it picks up is 0.335, and only right at
+          the outer rim where the arm tips sweep. Every point of the headline holds at least
+          0.165. Both numbers move together — pushing coverage to 0.26 puts 0.46 on the rim —
+          so this is the balance, not a maximum.
           Built from --glow-cyan via color-mix so it tracks the token instead of freezing a
           second copy of the hex. */}
       <div
@@ -38,9 +40,9 @@ function Glows() {
         className="pointer-events-none absolute inset-0 select-none"
         style={{
           background:
-            "radial-gradient(22% 24% at 13% 16%, " +
+            "radial-gradient(34% 28% at 21% 16%, " +
             "color-mix(in srgb, var(--glow-cyan) 58%, transparent) 0%, " +
-            "color-mix(in srgb, var(--glow-cyan) 44%, transparent) 72%, " +
+            "color-mix(in srgb, var(--glow-cyan) 44%, transparent) 74%, " +
             "transparent 100%)",
         }}
       />
