@@ -43,6 +43,16 @@ export const fragmentShader = /* glsl */ `
   // 0.995/0.980 across, 0.900/0.870 down.
   const vec2 CIPHER_FIT = vec2(1.0153, 1.0345);
 
+  // Crop. Both plates fray along their own top and bottom borders — the bill's alpha edge
+  // and the halftone's sparse border dots — and no amount of registering them fixes an edge
+  // that is ragged in the source. So cut the composite to a straight inset rectangle and let
+  // that be the edge. Symmetric, so it holds whichever way the texture's V runs. The note
+  // spans 0.048..0.952 of the plate, so 0.075 trims a little inside its border. Left and
+  // right need no crop: the cover fit already samples 0.055..0.945 across, well inside the
+  // note, so those edges are the quad's own and were always clean.
+  const float CROP_V = 0.075;
+  const float CROP_AA = 0.006; // feather, so the cut is antialiased rather than a hard step
+
   vec2 unrotate(vec2 texUv, float aspect, float angle) {
     vec2 p = (texUv - 0.5) * vec2(aspect, 1.0); // into square space, or the turn skews
     float s = sin(angle), c = cos(angle);
@@ -113,14 +123,15 @@ export const fragmentShader = /* glsl */ `
     vec2 inside = step(vec2(0.0), cipherUv) * step(cipherUv, vec2(1.0));
     vec3 cipherRGB = mix(plainCol.rgb, texture2D(uCipher, cipherUv).rgb, inside.x * inside.y);
 
-    // The plain bill's alpha is the only clean silhouette in play: a level, antialiased
-    // rectangle, constant across every column. The cipher plate has none at all — every one
-    // of its pixels is alpha 255, an opaque white background — so mixing the two alphas
-    // grew the shape outward into a full rectangle, cell by cell, as the front passed over
-    // the bill's transparent margins. The jitter then chewed that growing boundary into
-    // loose blocks. Gate on the plain silhouette instead: the bill keeps one clean edge the
-    // whole way through and only its contents dissolve.
-    vec4 col = vec4(mix(plainCol.rgb, cipherRGB, encrypted), plainCol.a);
+    // Silhouette. Neither plate can supply a clean one: the cipher has no alpha at all
+    // (every pixel 255, an opaque white background) and the bill's own alpha edge frays once
+    // the cells and jitter work on it. The crop rectangle supplies the edge instead, and the
+    // bill's alpha only clips it so nothing paints past the note. min() rather than a
+    // multiply, so the crop stays a hard straight line instead of inheriting the bill's
+    // frayed falloff.
+    float cropMask = smoothstep(CROP_V, CROP_V + CROP_AA, uv.y)
+                   * (1.0 - smoothstep(1.0 - CROP_V - CROP_AA, 1.0 - CROP_V, uv.y));
+    vec4 col = vec4(mix(plainCol.rgb, cipherRGB, encrypted), min(plainCol.a, cropMask));
 
     // cyan scan line riding the encryption front, faded out at both ends so the
     // finished plate is clean and the untouched plate isn't pre-lit
