@@ -21,6 +21,24 @@ const MONO_LABEL_STYLE = {
 function Glows() {
   return (
     <>
+      {/* Broad cyan wash over the top of the stage, fading into the page white. Rendered
+          first so it sits under the two ellipse glows, which stay as the design's local hot
+          spots rather than being replaced by this. Centred right of middle and above the top
+          edge, so the strongest part is off-canvas and only its falloff is on screen — that
+          is what keeps it reading as light rather than as a painted band.
+          Built from --glow-cyan via color-mix so it tracks the token instead of freezing a
+          second copy of the hex. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 select-none"
+        style={{
+          background:
+            "radial-gradient(125% 85% at 62% -12%, " +
+            "color-mix(in srgb, var(--glow-cyan) 55%, transparent) 0%, " +
+            "color-mix(in srgb, var(--glow-cyan) 26%, transparent) 40%, " +
+            "transparent 78%)",
+        }}
+      />
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/assets/glow-top.svg"
