@@ -45,13 +45,14 @@ const SCROLL_DECAY = 0.88;
 // slow lissajous rather than a repeating figure-eight.
 const IDLE_TILT_SPEED = 0.42;
 const IDLE_TILT_RATIO = 0.68; // second axis rate, relative to the first
-// Pointer proximity, measured from the logo's centre in units of its half-size. Inside
-// HOVER_NEAR the reflection is at full strength; past HOVER_FAR it is off. HOVER_FAR is
-// deliberately beyond the plate itself so the reflection begins to answer as the cursor
-// approaches, rather than snapping on at the edge of the canvas.
-const HOVER_NEAR = 0.75;
-const HOVER_FAR = 1.9;
 const HOVER_EASE = 6; // approach rate per second toward the measured proximity
+// Resolution of the alpha lookup built from the base texture. The hover tests this rather
+// than the quad the asterisk is drawn on: the quad is square and the asterisk does not fill
+// it, so raycasting the mesh alone would still trigger from the empty corners.
+const ALPHA_LOOKUP = 128;
+// Base glass renders around alpha 176 inside the shape and 0 outside, so anything well clear
+// of zero reads as "on the art" while still excluding the antialiased fringe.
+const ALPHA_HIT = 40;
 // multiplier on idleSpeed -> resting angular velocity (rad/s); default 0.5*0.2 = 0.1 rad/s,
 // a full turn in ~63s (luxury-watch pace).
 const IDLE_VEL = 0.2;
@@ -165,43 +166,67 @@ function LogoQuad({
   const hoverDir = useRef(new THREE.Vector2(0, 0)); // unit offset from centre to pointer
   const canvasRect = useRef<DOMRect | null>(null);
 
-  // Pointer proximity drives both the reflection and a lean toward the cursor. The rect is
-  // cached and refreshed on resize/scroll rather than measured inside the move handler —
-  // getBoundingClientRect there would force a layout on every mouse move.
+  // Alpha lookup off the base texture, so the hover can ask "is the pointer on the asterisk"
+  // rather than "is it near the canvas". Sampled once into a small array — reading pixels per
+  // pointer move would be far too slow, and 128 is finer than the arms are thin.
+  const alphaMap = useMemo(() => {
+    const img = base.image as CanvasImageSource & { width?: number };
+    if (!img || !img.width) return null;
+    const c = document.createElement("canvas");
+    c.width = ALPHA_LOOKUP;
+    c.height = ALPHA_LOOKUP;
+    const ctx2d = c.getContext("2d", { willReadFrequently: true });
+    if (!ctx2d) return null;
+    ctx2d.drawImage(img, 0, 0, ALPHA_LOOKUP, ALPHA_LOOKUP);
+    const px = ctx2d.getImageData(0, 0, ALPHA_LOOKUP, ALPHA_LOOKUP).data;
+    const out = new Uint8Array(ALPHA_LOOKUP * ALPHA_LOOKUP);
+    for (let i = 0; i < out.length; i++) out[i] = px[i * 4 + 3];
+    return out;
+  }, [base]);
+
+  // uv is fixed to the plate, so this stays correct however far the logo has spun or tilted.
+  // Flipped on v: GL samples bottom-up, the 2D canvas above wrote top-down.
+  const overArt = (uv?: THREE.Vector2) => {
+    if (!alphaMap || !uv) return false;
+    const x = Math.min(ALPHA_LOOKUP - 1, Math.max(0, Math.floor(uv.x * ALPHA_LOOKUP)));
+    const y = Math.min(ALPHA_LOOKUP - 1, Math.max(0, Math.floor((1 - uv.y) * ALPHA_LOOKUP)));
+    return alphaMap[y * ALPHA_LOOKUP + x] > ALPHA_HIT;
+  };
+
+  // Cached and refreshed on resize/scroll rather than measured in the pointer handler —
+  // getBoundingClientRect there would force a layout on every move. Only the lean direction
+  // needs it now; whether the pointer counts as "over" comes from the raycast.
   useEffect(() => {
     const el = gl.domElement;
     const measure = () => {
       canvasRect.current = el.getBoundingClientRect();
     };
     measure();
-
-    const onMove = (e: PointerEvent) => {
-      const r = canvasRect.current;
-      if (!r || r.width === 0 || r.height === 0) return;
-      const halfW = r.width / 2;
-      const halfH = r.height / 2;
-      const nx = (e.clientX - (r.left + halfW)) / halfW;
-      const ny = (e.clientY - (r.top + halfH)) / halfH;
-      const dist = Math.hypot(nx, ny);
-      hoverTarget.current = 1 - THREE.MathUtils.smoothstep(dist, HOVER_NEAR, HOVER_FAR);
-      const len = Math.max(dist, 1e-3);
-      hoverDir.current.set(nx / len, ny / len);
-    };
-    const onLeave = () => {
-      hoverTarget.current = 0;
-    };
-
-    window.addEventListener("pointermove", onMove, { passive: true });
     window.addEventListener("resize", measure);
     window.addEventListener("scroll", measure, { passive: true });
-    document.addEventListener("pointerleave", onLeave);
     return () => {
-      window.removeEventListener("pointermove", onMove);
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", measure);
-      document.removeEventListener("pointerleave", onLeave);
     };
   }, [gl]);
+
+  const onPointerMove = (e: ThreeEvent<PointerEvent>) => {
+    const on = overArt(e.uv);
+    hoverTarget.current = on ? 1 : 0;
+    if (!on) return;
+    const r = canvasRect.current;
+    if (!r || r.width === 0 || r.height === 0) return;
+    const nx = (e.clientX - (r.left + r.width / 2)) / (r.width / 2);
+    const ny = (e.clientY - (r.top + r.height / 2)) / (r.height / 2);
+    const len = Math.max(Math.hypot(nx, ny), 1e-3);
+    hoverDir.current.set(nx / len, ny / len);
+  };
+
+  // R3F only raycasts the quad, so leaving it stops firing move events entirely — without
+  // this the reveal would stick at whatever it held on the way out.
+  const onPointerOut = () => {
+    hoverTarget.current = 0;
+  };
 
   // YXZ so the Z spin is applied first, about the plate's own normal, and the X/Y tilt then
   // turns that spinning plate in view space. Default XYZ order would let the tilt drag the
@@ -375,7 +400,13 @@ function LogoQuad({
   });
 
   return (
-    <mesh ref={meshRef} rotation={[0, 0, BASE_ROTATION]} onPointerDown={onPointerDown}>
+    <mesh
+      ref={meshRef}
+      rotation={[0, 0, BASE_ROTATION]}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerOut={onPointerOut}
+    >
       <planeGeometry args={[1.7, 1.7]} />
       <primitive object={material} attach="material" />
     </mesh>
