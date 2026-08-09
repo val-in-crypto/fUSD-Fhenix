@@ -15,7 +15,7 @@ const TOKEN_SRC = "/assets/hero-token.png";
 
 const BASE_COIN = 56; // px baseline coin height at depth 1
 const TOKEN_SIZE = 400; // px height of the formed hero token
-const DURATION = 2.8; // seconds for a full OFF↔ON transition
+const DURATION = 1.5; // seconds for a full OFF↔ON transition
 
 /** Deterministic pseudo-random in [0,1) — no Math.random, so the field is identical every
  *  mount (§A3: "deterministic, not random"). */
@@ -100,7 +100,21 @@ export default function OrbitCanvas({
       if (im.complete) bake(im, idx);
     });
 
+    // Bake the token the same way, and for a second reason: it is a 900x900 PNG whose first
+    // draw lands on the exact frame the token appears. Decoding and rasterising it there
+    // costs a frame precisely at the moment the eye is on it, which is the hitch in the
+    // hand-off. Doing it once up front means that frame is just a blit.
+    let tokenSprite: { canvas: HTMLCanvasElement; aspect: number } | undefined;
     const token = new Image();
+    token.onload = () => {
+      if (token.naturalWidth === 0) return;
+      const aspect = token.naturalWidth / token.naturalHeight;
+      const off = document.createElement("canvas");
+      off.height = Math.round(TOKEN_SIZE * 1.05 * 2); // max scale (breathing) x dpr cap
+      off.width = Math.max(1, Math.round(off.height * aspect));
+      off.getContext("2d")?.drawImage(token, 0, 0, off.width, off.height);
+      tokenSprite = { canvas: off, aspect };
+    };
     token.src = TOKEN_SRC;
 
     const coins: Coin[] = Array.from({ length: count }, (_, i) => ({
@@ -149,16 +163,16 @@ export default function OrbitCanvas({
     io.observe(canvas);
 
     const drawToken = (cx: number, cy: number, scale: number, rot: number, alpha: number) => {
-      if (!token.complete || token.naturalWidth === 0 || alpha <= 0) return;
-      const aspect = token.naturalWidth / token.naturalHeight;
+      if (!tokenSprite || alpha <= 0) return;
       const dh = TOKEN_SIZE * scale;
-      const dw = dh * aspect;
-      ctx.save();
+      const dw = dh * tokenSprite.aspect;
+      const cos = Math.cos(rot);
+      const sin = Math.sin(rot);
       ctx.globalAlpha = clamp01(alpha);
-      ctx.translate(cx, cy);
-      ctx.rotate(rot);
-      ctx.drawImage(token, -dw / 2, -dh / 2, dw, dh);
-      ctx.restore();
+      ctx.setTransform(dpr * cos, dpr * sin, -dpr * sin, dpr * cos, dpr * cx, dpr * cy);
+      ctx.drawImage(tokenSprite.canvas, -dw / 2, -dh / 2, dw, dh);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.globalAlpha = 1;
     };
 
     const render = (dt: number, prog: number, elapsed: number) => {
@@ -172,8 +186,13 @@ export default function OrbitCanvas({
       const tokenBottom = mergeRef.current != null ? mergeRef.current : cy + TOKEN_SIZE / 2;
       const tokenCenterY = tokenBottom - TOKEN_SIZE / 2;
 
-      const spiral = easeInOutCubic(clamp01(prog / 0.6)); // coils in over the first 60%
-      const tok = easeOutCubic(clamp01((prog - 0.66) / 0.34)); // token forms over the last third
+      // These two overlap deliberately, 0.58 to 0.70. They used to be disjoint — the spiral
+      // finished at 0.60 and the token only began at 0.66 — leaving a beat where the coins
+      // sat piled on the merge point and nothing on screen changed. Intended as anticipation,
+      // it reads as the animation catching. Starting the token while the last coins are
+      // still closing hands off in one continuous move.
+      const spiral = easeInOutCubic(clamp01(prog / 0.7));
+      const tok = easeOutCubic(clamp01((prog - 0.58) / 0.42));
       const twist = spiral * Math.PI * 1.2; // spiral path, not straight lines
       const speedUp = 1 + spiral * 1.6;
       const coinAlpha = 1 - tok;
