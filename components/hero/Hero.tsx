@@ -23,15 +23,14 @@ function Glows() {
     <>
       {/* Cyan wash behind the headline. Local to this corner on purpose — spanning the full
           top edge tints the whole masthead and flattens the asterisk's own glow into it.
-          Centred on the headline and shaped like it — wide and shallow — rather than
-          anchored in the corner. The headline is 564x119, so a corner-anchored radial cannot
-          reach its right end without also throwing cyan halfway down the page.
-          Tightening it is a matter of the stops as much as the radii: shrinking the ellipse
-          alone drops the far corner of the copy off the gradient. Holding most of the
-          strength out to 70% before the falloff starts keeps the text covered inside a
-          smaller footprint. Sampled against the live layout, the headline's four corners sit
-          at 0.22-0.44 and the logo at 0.42, while just right of the copy falls to 0.08 and
-          everything below it to zero.
+          Bounded by the asterisk, which is the binding constraint here. The visible art runs
+          458-927px of a 1280px stage while the headline runs 40-604px, so the two overlap by
+          146px and no single gradient can cover the whole headline and still clear the logo.
+          Clearing the logo wins: this reaches 448px, ten short of the art, measured to zero
+          on every probe across it. The earlier version sat at 0.44 alpha on its upper arm.
+          The cost is that the last word of the headline sits outside the wash.
+          Holding most of the strength out to 72% before the falloff keeps the copy that IS
+          inside it evenly lit rather than fading across its own width.
           Built from --glow-cyan via color-mix so it tracks the token instead of freezing a
           second copy of the hex. */}
       <div
@@ -39,9 +38,9 @@ function Glows() {
         className="pointer-events-none absolute inset-0 select-none"
         style={{
           background:
-            "radial-gradient(34% 28% at 23% 17%, " +
-            "color-mix(in srgb, var(--glow-cyan) 56%, transparent) 0%, " +
-            "color-mix(in srgb, var(--glow-cyan) 42%, transparent) 70%, " +
+            "radial-gradient(22% 24% at 13% 16%, " +
+            "color-mix(in srgb, var(--glow-cyan) 58%, transparent) 0%, " +
+            "color-mix(in srgb, var(--glow-cyan) 44%, transparent) 72%, " +
             "transparent 100%)",
         }}
       />
