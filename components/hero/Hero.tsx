@@ -21,21 +21,22 @@ const MONO_LABEL_STYLE = {
 function Glows() {
   return (
     <>
-      {/* Cyan wash behind the headline. Local to this corner on purpose — spanning the full
-          top edge tints the whole masthead and flattens the asterisk's own glow into it.
+      {/* Cyan wash behind the headline, and now the only light at the top of the stage.
+          glow-top.svg used to sit over this: a 1568px-wide blurred ellipse spanning -426 to
+          1142px of a 1280px stage, so it washed the full width and ran past both edges
+          regardless of how this one was tuned. It is dropped below — CLAUDE.md lists it as a
+          preserved motif (Figma 42:66), so restoring it is one element, but it cannot
+          coexist with a wash sized to the headline.
           Wide and shallow, so it spans the headline without reaching down into the asterisk.
           The two genuinely overlap — the art runs 458-927px across and the headline 40-604px
           — but only above y=213, where the headline ends and the art has barely begun (its
-          top is y=163). Staying flat exploits that: this reaches 704px across but only 317px
-          down, which covers "yield" while passing over the asterisk's shoulder.
+          top is y=163). Staying flat exploits that.
           Reaches 653px, so it clears the asterisk's left edge at 458px in everything but the
           rim: scanned across the art's true extent (its 234px radius, not the corners of its
           box, which an asterisk leaves empty) the most it picks up is 0.12.
-          Trimmed from the right by the horizontal radius alone, with the centre following it
-          left, so "dual-mode" and the logo hold their level while the far end comes down.
-          That end is the whole tension in this thing — "yield" sits at 458-604px, physically
-          on top of the asterisk's box — so trimming right and covering "yield" are the same
-          dial pulled opposite ways. It now carries 0.14 falling to 0.01 across its width.
+          That far end is the tension in this thing — "yield" sits at 458-604px, physically on
+          top of the asterisk's box — so trimming right and covering "yield" are the same dial
+          pulled opposite ways. It now carries 0.14 falling to 0.01 across its width.
           Built from --glow-cyan via color-mix so it tracks the token instead of freezing a
           second copy of the hex. */}
       <div
@@ -49,13 +50,8 @@ function Glows() {
             "transparent 100%)",
         }}
       />
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/assets/glow-top.svg"
-        alt=""
-        aria-hidden="true"
-        className="pointer-events-none absolute left-[28%] top-[1%] w-[1568px] max-w-none -translate-x-1/2 -translate-y-1/2 select-none"
-      />
+      {/* glow-bottom stays: it sits low and right, around the asterisk, and is the only
+          light on that side of the stage. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/assets/glow-bottom.svg"
