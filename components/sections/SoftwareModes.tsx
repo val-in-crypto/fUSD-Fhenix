@@ -76,15 +76,30 @@ function useSequence() {
   return { rootRef, toggleRef, on, toggle, mergeBottomY };
 }
 
+/**
+ * The field the coins orbit in. Was glow-top.svg — a blurred ellipse — and is now the same
+ * token-driven radial used in the hero and on the compare cards, so the site has one way of
+ * making cyan light rather than a CSS treatment in some places and an SVG asset in others.
+ *
+ * Box, scale and opacity are unchanged: aspect-ratio reproduces the SVG's 1568x948 viewBox
+ * so the width classes at the call sites still size it, and the bloom is still 1 -> 1.18 with
+ * 0.68 -> 0.95 over 900ms.
+ */
 function Glow({ on, className }: { on: boolean; className?: string }) {
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src="/assets/glow-top.svg"
-      alt=""
+    <div
       aria-hidden="true"
       className={`pointer-events-none absolute left-1/2 top-1/2 max-w-none select-none ${className ?? ""}`}
       style={{
+        aspectRatio: "1568 / 948",
+        // closest-side puts the ellipse's radii on the box's own half-width and half-height,
+        // so it fills the box whatever width the call site gives it.
+        background:
+          "radial-gradient(closest-side, " +
+          "color-mix(in srgb, var(--glow-cyan) 62%, transparent) 0%, " +
+          "color-mix(in srgb, var(--glow-cyan) 44%, transparent) 38%, " +
+          "color-mix(in srgb, var(--glow-cyan) 16%, transparent) 68%, " +
+          "transparent 100%)",
         transform: `translate(-50%, -50%) scale(${on ? 1.18 : 1})`,
         opacity: on ? 0.95 : 0.68,
         transition: `transform 900ms ${GLOW_EASE}, opacity 900ms ${GLOW_EASE}`,
