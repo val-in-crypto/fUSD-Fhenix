@@ -8,10 +8,14 @@ import WaitlistPill from "@/components/ui/WaitlistPill";
  * to the text. Replaces the old small mono status label.
  */
 
-// Exact gradient + type spec from Figma node 93:91.
+// Gradient + type spec from Figma node 93:91. The stops are authored at full strength and
+// held back to the spec's 30% by opacity in .live-headline, which composites identically over
+// the white footer but leaves one animatable property for the hover. Baking the alpha into
+// the stops instead would make the hover unanimatable — gradients do not interpolate, so it
+// could only snap between two images.
 const LIVE_TEXT_STYLE = {
   backgroundImage:
-    "linear-gradient(90deg, rgba(10,217,220,0.3) 0%, rgba(6,116,118,0.3) 52.885%, rgba(88,252,255,0.3) 100%)",
+    "linear-gradient(90deg, rgb(10,217,220) 0%, rgb(6,116,118) 52.885%, rgb(88,252,255) 100%)",
   WebkitBackgroundClip: "text",
   backgroundClip: "text",
   color: "transparent",
@@ -46,10 +50,14 @@ export default function SiteFooter() {
             fontSize: 96,
             letterSpacing: "-0.96px",
             lineHeight: 1.1,
-            ...LIVE_TEXT_STYLE,
           }}
         >
-          Live on Arbitrum soon
+          {/* Inline span, so the hover target is the glyph run. The <p> is a full-width
+              absolutely-positioned box and the line only covers about two thirds of it —
+              on the <p> the hover would fire from its empty margins too. */}
+          <span className="live-headline" style={LIVE_TEXT_STYLE}>
+            Live on Arbitrum soon
+          </span>
         </p>
       </div>
 
@@ -68,10 +76,11 @@ export default function SiteFooter() {
             letterSpacing: "-0.4px",
             lineHeight: 1.1,
             marginBottom: LIVE_BASELINE_DROP,
-            ...LIVE_TEXT_STYLE,
           }}
         >
-          Live on Arbitrum soon
+          <span className="live-headline" style={LIVE_TEXT_STYLE}>
+            Live on Arbitrum soon
+          </span>
         </p>
       </div>
     </footer>

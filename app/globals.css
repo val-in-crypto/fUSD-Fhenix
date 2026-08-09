@@ -251,6 +251,26 @@ body {
   }
 }
 
+/* ── Footer headline — hover ──────────────────────────────────────────────────
+   Rest opacity is the Figma spec's 30%, applied here rather than baked into the
+   gradient's alpha stops. Same composite over the white footer, but it leaves a
+   single animatable property: gradients do not interpolate, so a hover that
+   swapped background-image could only snap between two states. */
+.live-headline {
+  opacity: 0.3;
+  transition: opacity 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.live-headline:hover {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-headline {
+    transition: none;
+  }
+}
+
 body {
   margin: 0;
   background: var(--bg);
