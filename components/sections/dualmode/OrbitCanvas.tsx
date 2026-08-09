@@ -75,11 +75,31 @@ export default function OrbitCanvas({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const imgs = COIN_SRCS.map((src) => {
+    // Pre-scale each coin once, on load. The sources are ~230px tall and are drawn near
+    // 56px, so the old path asked the rasteriser to filter a 4x downscale eighty times a
+    // frame. Baking them to roughly their on-screen footprint makes each draw close to a
+    // blit. Sized for the largest a coin ever gets (BASE_COIN x max sizeVar x max frontness)
+    // at the dpr cap, so they are never upscaled.
+    const SPRITE_H = Math.round(BASE_COIN * 1.5 * 2);
+    const sprites: ({ canvas: HTMLCanvasElement; aspect: number } | undefined)[] = [];
+
+    const bake = (im: HTMLImageElement, idx: number) => {
+      if (!im.complete || im.naturalWidth === 0) return;
+      const aspect = im.naturalWidth / im.naturalHeight;
+      const off = document.createElement("canvas");
+      off.width = Math.max(1, Math.round(SPRITE_H * aspect));
+      off.height = SPRITE_H;
+      off.getContext("2d")?.drawImage(im, 0, 0, off.width, off.height);
+      sprites[idx] = { canvas: off, aspect };
+    };
+
+    COIN_SRCS.forEach((src, idx) => {
       const im = new Image();
+      im.onload = () => bake(im, idx);
       im.src = src;
-      return im;
+      if (im.complete) bake(im, idx);
     });
+
     const token = new Image();
     token.src = TOKEN_SRC;
 
@@ -92,6 +112,20 @@ export default function OrbitCanvas({
       selfRot: rand(i, 5) * Math.PI * 2,
       selfRotSpeed: (rand(i, 6) - 0.5) * 0.5,
     }));
+
+    // Scratch buffers, allocated once. The render loop must not allocate: the old path built
+    // a fresh array of `count` objects with .map() and then sorted a second array off it,
+    // every frame — around five thousand short-lived objects a second at 80 coins and 60fps.
+    // That much GC churn is exactly what reads as stutter in an otherwise cheap 2D canvas.
+    const oX = new Float32Array(count);
+    const oY = new Float32Array(count);
+    const oScale = new Float32Array(count);
+    const oAlpha = new Float32Array(count);
+    const oFront = new Float32Array(count);
+    const order = new Uint16Array(count);
+    for (let i = 0; i < count; i++) order[i] = i;
+    // Sorts the index array in place against oFront — painter's order without a new array.
+    const byFront = (a: number, b: number) => oFront[a] - oFront[b];
 
     let w = 0;
     let h = 0;
@@ -145,36 +179,40 @@ export default function OrbitCanvas({
       const coinAlpha = 1 - tok;
 
       if (coinAlpha > 0.01) {
-        const list = coins.map((c) => {
+        for (let i = 0; i < count; i++) {
+          const c = coins[i];
           if (!reduced && dt > 0) {
             c.ang += c.angSpeed * dt * speedUp;
             c.selfRot += c.selfRotSpeed * dt;
           }
           const a = c.ang + twist;
-          const orbitX = cx + Math.cos(a) * rxMax * c.fr;
-          const orbitY = cy + Math.sin(a) * ryMax * c.fr;
-          const x = mix(orbitX, cx, spiral); // converge to centre-x
-          const y = mix(orbitY, tokenCenterY, spiral); // …and up to the token point
           const frontness = (Math.sin(a) + 1) / 2;
-          const scale = (0.5 + 0.6 * frontness) * c.sizeVar;
-          const alpha = (0.4 + 0.6 * frontness) * coinAlpha;
-          return { c, x, y, frontness, scale, alpha };
-        });
-        list.sort((a, b) => a.frontness - b.frontness);
-
-        for (const it of list) {
-          const im = imgs[it.c.img];
-          if (!im.complete || im.naturalWidth === 0) continue;
-          const aspect = im.naturalWidth / im.naturalHeight;
-          const dh = BASE_COIN * it.scale;
-          const dw = dh * aspect;
-          ctx.save();
-          ctx.globalAlpha = clamp01(it.alpha);
-          ctx.translate(it.x, it.y);
-          ctx.rotate(it.c.selfRot);
-          ctx.drawImage(im, -dw / 2, -dh / 2, dw, dh);
-          ctx.restore();
+          oX[i] = mix(cx + Math.cos(a) * rxMax * c.fr, cx, spiral); // converge to centre-x
+          oY[i] = mix(cy + Math.sin(a) * ryMax * c.fr, tokenCenterY, spiral); // …and up
+          oFront[i] = frontness;
+          oScale[i] = (0.5 + 0.6 * frontness) * c.sizeVar;
+          oAlpha[i] = (0.4 + 0.6 * frontness) * coinAlpha;
         }
+        order.sort(byFront);
+
+        for (let k = 0; k < count; k++) {
+          const i = order[k];
+          const sprite = sprites[coins[i].img];
+          if (!sprite) continue;
+          const dh = BASE_COIN * oScale[i];
+          const dw = dh * sprite.aspect;
+          const rot = coins[i].selfRot;
+          const cos = Math.cos(rot);
+          const sin = Math.sin(rot);
+          ctx.globalAlpha = clamp01(oAlpha[i]);
+          // setTransform rather than save/translate/rotate/restore. Eighty save/restore
+          // pairs a frame is the other half of the cost — each one snapshots the whole 2D
+          // state, and none of it needs preserving between coins.
+          ctx.setTransform(dpr * cos, dpr * sin, -dpr * sin, dpr * cos, dpr * oX[i], dpr * oY[i]);
+          ctx.drawImage(sprite.canvas, -dw / 2, -dh / 2, dw, dh);
+        }
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.globalAlpha = 1;
       }
 
       if (tok > 0) {
@@ -201,7 +239,10 @@ export default function OrbitCanvas({
       raf = requestAnimationFrame(frame);
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
-      if (!visible) return;
+      // The desktop and mobile trees are both in the DOM; one is display:none and measures
+      // 0x0. Without the size test that twin still ran the whole simulation every frame
+      // against a canvas nobody can see — the other canvases guard this way too.
+      if (!visible || w === 0 || h === 0) return;
       elapsed += dt;
 
       const target = onRef.current ? 1 : 0;
