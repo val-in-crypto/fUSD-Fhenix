@@ -15,20 +15,15 @@ const LIVE_TEXT_STYLE = {
   WebkitBackgroundClip: "text",
   backgroundClip: "text",
   color: "transparent",
-  // Tracking as an em rather than the Figma pixel value, so it scales with the size below
-  // instead of tightening as the type grows. -0.96px at 96px is exactly -0.01em.
-  letterSpacing: "-0.01em",
 } as const;
 
-// The line is meant to span the full width, and 96px does not: measured in Instrument Serif
-// this string sets 8.77x its font-size wide, so 96px covers only 842 of 1280px. Dividing the
-// available width by that ratio sizes it to fit exactly, at any width, rather than guessing
-// a number that happens to work at one breakpoint.
-const GLYPH_RATIO = 8.77;
-// Capped at the stage's own 1440px max-width, past which vw would keep growing and overrun.
-const LIVE_SIZE_DESKTOP = `min(calc(100vw / ${GLYPH_RATIO}), ${Math.round(1440 / GLYPH_RATIO)}px)`;
-// Mobile carries 24px of padding either side, so it fills what is left of the viewport.
-const LIVE_SIZE_MOBILE = `calc((100vw - 48px) / ${GLYPH_RATIO})`;
+/**
+ * Drop needed to sit the glyphs on the bottom edge. Setting bottom to 0 only flushes the
+ * element's box; the ink still stops 19.3px short at 96px, because the line box reserves
+ * half-leading plus the font's 30px descent metric — and this line is uppercase, so it has
+ * no descenders to spend it on. In em rather than px so it stays correct if the size changes.
+ */
+const LIVE_BASELINE_DROP = "-0.201em";
 
 export default function SiteFooter() {
   return (
@@ -47,9 +42,10 @@ export default function SiteFooter() {
           className="absolute w-full text-center font-serif uppercase whitespace-nowrap not-italic"
           style={{
             left: 0,
-            bottom: 12,
-            fontSize: LIVE_SIZE_DESKTOP,
-            lineHeight: 1,
+            bottom: LIVE_BASELINE_DROP,
+            fontSize: 96,
+            letterSpacing: "-0.96px",
+            lineHeight: 1.1,
             ...LIVE_TEXT_STYLE,
           }}
         >
@@ -58,7 +54,9 @@ export default function SiteFooter() {
       </div>
 
       {/* ── Mobile ────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-6 px-6 pb-10 pt-6 md:hidden">
+      {/* pb-0: the headline runs to the bottom edge here too, so the padding that would
+          otherwise sit under it is carried by the rows above instead. */}
+      <div className="flex flex-col gap-6 px-6 pb-0 pt-6 md:hidden">
         <div className="flex items-end justify-between">
           <WaitlistPill className="self-start" />
           <Socials />
@@ -66,8 +64,10 @@ export default function SiteFooter() {
         <p
           className="font-serif uppercase whitespace-nowrap not-italic"
           style={{
-            fontSize: LIVE_SIZE_MOBILE,
-            lineHeight: 1,
+            fontSize: "clamp(40px, 13vw, 96px)",
+            letterSpacing: "-0.4px",
+            lineHeight: 1.1,
+            marginBottom: LIVE_BASELINE_DROP,
             ...LIVE_TEXT_STYLE,
           }}
         >
