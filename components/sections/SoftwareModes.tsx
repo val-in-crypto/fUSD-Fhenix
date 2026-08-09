@@ -20,8 +20,10 @@ import DissolveHeadline from "./dualmode/DissolveHeadline";
  */
 
 /** Drives the section's two states via the toggle. Auto-plays the reveal once on enter;
- *  after that `toggle` flips between orbit (OFF) and merged token (ON), reversibly. */
-function useSequence() {
+ *  after that `toggle` flips between orbit (OFF) and merged token (ON), reversibly.
+ *  `mergeGap` is the clearance between the formed token's bottom and the toggle — it sets
+ *  how much room the token has, so phones run a tighter one. */
+function useSequence(mergeGap = 48) {
   const reduced = useReducedMotion();
   const rootRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLDivElement>(null);
@@ -34,7 +36,7 @@ function useSequence() {
     const measure = () => {
       const s = rootRef.current?.getBoundingClientRect();
       const t = toggleRef.current?.getBoundingClientRect();
-      if (s && t) setMergeBottomY(t.top - s.top - 48);
+      if (s && t) setMergeBottomY(t.top - s.top - mergeGap);
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -44,7 +46,7 @@ function useSequence() {
       ro.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, []);
+  }, [mergeGap]);
 
   useEffect(() => {
     if (reduced) {
@@ -123,7 +125,9 @@ const HEADLINE_MOBILE = {
 
 export default function SoftwareModes() {
   const desktop = useSequence();
-  const mobile = useSequence();
+  // Tighter clearance on phones — 48px is a lot of the room the token has there, and every
+  // pixel of it comes straight off the token's size.
+  const mobile = useSequence(24);
 
   return (
     <section
@@ -152,9 +156,14 @@ export default function SoftwareModes() {
       </div>
 
       {/* ── Mobile ────────────────────────────────────────────────────────── */}
+      {/* Content sits at the bottom, not the top. It used to start straight after the top
+          padding and leave 282px of a 560px section empty underneath, while the token — which
+          has to fit above the toggle — was squeezed into the 181px left over. Pushing the
+          headline and toggle down hands that space to the token, which is the whole subject
+          of the section on a phone. */}
       <div
         ref={mobile.rootRef}
-        className="relative overflow-hidden px-6 py-20 md:hidden"
+        className="relative flex flex-col justify-end overflow-hidden px-6 pb-14 pt-10 md:hidden"
         style={{ minHeight: 560 }}
       >
         <Glow className="w-[760px]" />
@@ -166,12 +175,11 @@ export default function SoftwareModes() {
         />
         <div className="relative flex flex-col items-center justify-center gap-10 text-center">
           <DissolveHeadline play={mobile.on} className="font-display text-ink" style={HEADLINE_MOBILE} />
-          {/* 0.72 of the Figma size on phones. At full size the switch is 148px wide, 38% of
-              a 390px screen and 46% of a 320px one, which crowds a section that also has to
-              hold the headline and the merged token. The scale bottoms out at a 49px tall
-              control, so it stays above the ~44px minimum touch target. */}
+          {/* 0.65 of the Figma size on phones, giving a 96x44 control. 44px is the floor
+              here, not a coincidence — it is the minimum comfortable touch target, so this
+              is as small as the switch can go without becoming fiddly to hit. */}
           <div ref={mobile.toggleRef}>
-            <ModeToggle on={mobile.on} onClick={mobile.toggle} scale={0.72} />
+            <ModeToggle on={mobile.on} onClick={mobile.toggle} scale={0.65} />
           </div>
         </div>
       </div>
