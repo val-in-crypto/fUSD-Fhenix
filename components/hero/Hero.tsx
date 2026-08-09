@@ -21,22 +21,30 @@ const MONO_LABEL_STYLE = {
 function Glows() {
   return (
     <>
-      {/* Broad cyan wash over the top of the stage, fading into the page white. Rendered
+      {/* Cyan wash across the top of the stage, fading down into the page white. Rendered
           first so it sits under the two ellipse glows, which stay as the design's local hot
-          spots rather than being replaced by this. Centred right of middle and above the top
-          edge, so the strongest part is off-canvas and only its falloff is on screen — that
-          is what keeps it reading as light rather than as a painted band.
+          spots rather than being replaced by this.
+          Vertical, and full-bleed across the top edge — in the reference the corner under the
+          fUSD mark carries as much cyan as the centre does, so an off-centre radial is the
+          wrong shape: it would hot-spot somewhere and leave that corner pale. The horizontal
+          layer is only a lean, holding the cyan a little longer on the right where the logo
+          sits, not a second source of light.
           Built from --glow-cyan via color-mix so it tracks the token instead of freezing a
           second copy of the hex. */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 select-none"
         style={{
-          background:
-            "radial-gradient(125% 85% at 62% -12%, " +
-            "color-mix(in srgb, var(--glow-cyan) 55%, transparent) 0%, " +
-            "color-mix(in srgb, var(--glow-cyan) 26%, transparent) 40%, " +
-            "transparent 78%)",
+          background: [
+            "linear-gradient(to right, transparent 0%, " +
+              "color-mix(in srgb, var(--glow-cyan) 14%, transparent) 55%, " +
+              "color-mix(in srgb, var(--glow-cyan) 20%, transparent) 100%)",
+            "linear-gradient(to bottom, " +
+              "color-mix(in srgb, var(--glow-cyan) 46%, transparent) 0%, " +
+              "color-mix(in srgb, var(--glow-cyan) 34%, transparent) 22%, " +
+              "color-mix(in srgb, var(--glow-cyan) 14%, transparent) 48%, " +
+              "transparent 76%)",
+          ].join(", "),
         }}
       />
       {/* eslint-disable-next-line @next/next/no-img-element */}
