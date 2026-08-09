@@ -18,7 +18,33 @@ const MONO_LABEL_STYLE = {
   lineHeight: 0.9,
 } as const;
 
-function Glows() {
+/**
+ * Phone wash. A broad fall from the top edge rather than the desktop's corner radial: on a
+ * 390px screen the copy, the mark and the status line all sit in the top third and there is
+ * no side column to keep clear, so light gathered in one corner reads as a stray blob. The
+ * desktop geometry cannot simply be reused either — 31% x 27% at 20%/16% is 121x151px on a
+ * phone, a patch smaller than the headline it is meant to sit behind.
+ *
+ * Centred on the top edge so only the falloff is on screen, which is what keeps it reading as
+ * light rather than a painted band.
+ */
+const MOBILE_WASH =
+  "radial-gradient(130% 52% at 50% 0%, " +
+  "color-mix(in srgb, var(--glow-cyan) 52%, transparent) 0%, " +
+  "color-mix(in srgb, var(--glow-cyan) 30%, transparent) 45%, " +
+  "transparent 100%)";
+
+function Glows({ variant = "desktop" }: { variant?: "desktop" | "mobile" }) {
+  if (variant === "mobile") {
+    return (
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 select-none"
+        style={{ background: MOBILE_WASH }}
+      />
+    );
+  }
+
   return (
     <>
       {/* Cyan wash behind the headline, and now the only light on the stage.
@@ -215,7 +241,7 @@ export default function Hero() {
           logo takes whatever is left (flex-1), so the stack fits every phone instead
           of pushing the CTA past the fold on short ones. */}
       <div className="relative flex h-[100dvh] flex-col overflow-hidden px-6 pb-12 pt-6 md:hidden">
-        <Glows />
+        <Glows variant="mobile" />
 
         <div className="relative flex items-center justify-between">
           <Logo />
