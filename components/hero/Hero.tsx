@@ -21,11 +21,14 @@ const MONO_LABEL_STYLE = {
 function Glows() {
   return (
     <>
-      {/* Cyan wash in the top-left corner, behind the headline. Local to that corner on
-          purpose — spanning the full top edge tints the whole masthead and flattens the
-          asterisk's own glow into it, which is what the earlier full-bleed version got
-          wrong. It falls off before the mid-line, so the right column and the two ellipse
-          glows are untouched and stay the design's own hot spots.
+      {/* Cyan wash behind the headline. Local to this corner on purpose — spanning the full
+          top edge tints the whole masthead and flattens the asterisk's own glow into it.
+          Sized against the headline rather than the corner: a radial falls off elliptically,
+          so anchoring it at the very top edge put the headline's lower-right at 0.04 alpha
+          while the logo above sat at 0.37 — the cyan appeared to sit on top of the copy and
+          stop. Pushing the centre down to 6% and stretching the vertical radius to 85% holds
+          all four corners of the headline between 0.33 and 0.43, while the right column
+          stays at 0.06 and the two ellipse glows keep their own field.
           Built from --glow-cyan via color-mix so it tracks the token instead of freezing a
           second copy of the hex. */}
       <div
@@ -33,9 +36,9 @@ function Glows() {
         className="pointer-events-none absolute inset-0 select-none"
         style={{
           background:
-            "radial-gradient(58% 48% at 10% 0%, " +
-            "color-mix(in srgb, var(--glow-cyan) 46%, transparent) 0%, " +
-            "color-mix(in srgb, var(--glow-cyan) 22%, transparent) 45%, " +
+            "radial-gradient(70% 85% at 16% 6%, " +
+            "color-mix(in srgb, var(--glow-cyan) 50%, transparent) 0%, " +
+            "color-mix(in srgb, var(--glow-cyan) 32%, transparent) 55%, " +
             "transparent 100%)",
         }}
       />
