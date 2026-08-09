@@ -10,15 +10,14 @@ import DissolveHeadline from "./dualmode/DissolveHeadline";
  * Figma 85:2 "Software has modes. Money never got one" — Animation 3.
  *
  * On enter: the headline dissolves char-by-char while ~80 orbiting coins spiral inward and
- * merge into the hero token; the Dual Mode toggle then flips OFF→ON as the cyan glow blooms.
- * Timeline lives in ./dualmode/sequence.ts; the canvas runs the coin/token motion, this
- * controller fires the DOM beats (dissolve trigger, toggle, glow) on the same clock.
+ * merge into the hero token; the Dual Mode toggle then flips OFF→ON. The cyan field behind
+ * them holds steady throughout — see Glow. Timeline lives in ./dualmode/sequence.ts; the
+ * canvas runs the coin/token motion, this controller fires the DOM beats (dissolve trigger,
+ * toggle) on the same clock.
  *
- * Reduced motion: no sequence — the settled hero token, toggle ON, and steady glow render
- * straight away. The headline text is always real DOM (aria-label) for screen readers.
+ * Reduced motion: no sequence — the settled hero token and toggle ON render straight away.
+ * The headline text is always real DOM (aria-label) for screen readers.
  */
-
-const GLOW_EASE = "cubic-bezier(0.16, 1, 0.3, 1)";
 
 /** Drives the section's two states via the toggle. Auto-plays the reveal once on enter;
  *  after that `toggle` flips between orbit (OFF) and merged token (ON), reversibly. */
@@ -81,15 +80,19 @@ function useSequence() {
  * token-driven radial used in the hero and on the compare cards, so the site has one way of
  * making cyan light rather than a CSS treatment in some places and an SVG asset in others.
  *
- * Box, scale and opacity are unchanged: aspect-ratio reproduces the SVG's 1568x948 viewBox
- * so the width classes at the call sites still size it, and the bloom is still 1 -> 1.18 with
- * 0.68 -> 0.95 over 900ms.
+ * Deliberately static. It used to bloom with the merge — scaling to 1.18 and lifting to 0.95
+ * opacity as the coins came together — which made the background swell at exactly the moment
+ * the eye should be on the token forming in front of it. Holding it still lets the merge read
+ * as the coins doing something rather than the whole section brightening.
+ *
+ * aspect-ratio reproduces the SVG's 1568x948 viewBox, so the width classes at the call sites
+ * still size it.
  */
-function Glow({ on, className }: { on: boolean; className?: string }) {
+function Glow({ className }: { className?: string }) {
   return (
     <div
       aria-hidden="true"
-      className={`pointer-events-none absolute left-1/2 top-1/2 max-w-none select-none ${className ?? ""}`}
+      className={`pointer-events-none absolute left-1/2 top-1/2 max-w-none -translate-x-1/2 -translate-y-1/2 select-none ${className ?? ""}`}
       style={{
         aspectRatio: "1568 / 948",
         // closest-side puts the ellipse's radii on the box's own half-width and half-height,
@@ -100,9 +103,7 @@ function Glow({ on, className }: { on: boolean; className?: string }) {
           "color-mix(in srgb, var(--glow-cyan) 44%, transparent) 38%, " +
           "color-mix(in srgb, var(--glow-cyan) 16%, transparent) 68%, " +
           "transparent 100%)",
-        transform: `translate(-50%, -50%) scale(${on ? 1.18 : 1})`,
-        opacity: on ? 0.95 : 0.68,
-        transition: `transform 900ms ${GLOW_EASE}, opacity 900ms ${GLOW_EASE}`,
+        opacity: 0.68,
       }}
     />
   );
@@ -135,7 +136,7 @@ export default function SoftwareModes() {
         className="relative mx-auto hidden w-full max-w-[1440px] overflow-hidden md:block"
         style={{ height: 787 }}
       >
-        <Glow on={desktop.on} className="w-[1280px]" />
+        <Glow className="w-[1280px]" />
         <OrbitCanvas
           count={80}
           on={desktop.on}
@@ -156,7 +157,7 @@ export default function SoftwareModes() {
         className="relative overflow-hidden px-6 py-20 md:hidden"
         style={{ minHeight: 560 }}
       >
-        <Glow on={mobile.on} className="w-[760px]" />
+        <Glow className="w-[760px]" />
         <OrbitCanvas
           count={40}
           on={mobile.on}
