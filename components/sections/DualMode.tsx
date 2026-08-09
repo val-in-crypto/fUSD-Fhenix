@@ -53,8 +53,10 @@ function CompareCard({ card, absolute }: { card: CompareCard; absolute?: boolean
           in its corner, and fixed at 560px wide however the card was sized.
           Anchored at the corner and measured in card-relative units, so it holds its shape
           on both the 580px desktop card and the narrower mobile one. Sampled against the
-          card: 0.29 in the corner, 0.12 up the right edge, 0.07 along the bottom, and
-          effectively nothing on the copy — 0.009 at the body, 0 at the title and label.
+          card: 0.24 in the corner, 0.10 up the right edge, 0.06 along the bottom, and
+          effectively nothing on the copy — 0.007 at the body, 0 at the title and label.
+          Only the stops carry the brightness; the geometry above is what shapes it, so the
+          two are independent to tune.
           Built from --glow-cyan via color-mix so it tracks the token. */}
       <div
         aria-hidden="true"
@@ -62,8 +64,8 @@ function CompareCard({ card, absolute }: { card: CompareCard; absolute?: boolean
         style={{
           background:
             "radial-gradient(70% 95% at 100% 100%, " +
-            "color-mix(in srgb, var(--glow-cyan) 30%, transparent) 0%, " +
-            "color-mix(in srgb, var(--glow-cyan) 14%, transparent) 45%, " +
+            "color-mix(in srgb, var(--glow-cyan) 24%, transparent) 0%, " +
+            "color-mix(in srgb, var(--glow-cyan) 11%, transparent) 45%, " +
             "transparent 100%)",
         }}
       />
