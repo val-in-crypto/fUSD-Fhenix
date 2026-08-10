@@ -293,8 +293,16 @@ body {
 
 /* ── Hero glass — the turn between the designer's two placements ──────────────
    Figma gives the same layer twice at -22.35deg: 564.15x599.4 at (342.5,147.42)
-   and 573.85x587.55 at (322.75,138.92). The delta is the whole animation —
-   centre drifts -14.9,-14.4px, box goes 1.7% wider and 2.0% shorter.
+   and 573.85x587.55 at (322.75,138.92). Those give the *direction* of the move —
+   drift up-left, box wider and shorter — but not a usable amplitude. Taken
+   literally the delta is 14.9px on a 564px box, 2.6%, spread over 9 seconds:
+   0.028px per frame at 60fps. Sub-pixel. It ran correctly and looked frozen.
+
+   So the direction and proportion are the designer's, scaled 2.5x to something
+   the eye can actually follow: 6.6% drift, +4.3% / -5.0% on the box. Rotation
+   stays fixed at the spec's -22.35deg — the angle change comes from crossing to
+   the second render, which is a genuinely different angle, so swinging the
+   rotation as well would double-count it.
 
    Transform order is deliberate. CSS applies these right to left, so scale runs
    first in the element's own space — which is the space Figma reports width and
@@ -302,11 +310,10 @@ body {
    space. Any other order shears the plate instead of turning it.
 
    Drift is a percentage of the element's own box, so it tracks the stage the
-   same way the box does. 9s each way: slow enough to read as the object
-   breathing rather than as an animation playing. */
+   same way the box does. */
 @keyframes hero-glass-turn {
   to {
-    transform: translate(-2.641%, -2.407%) rotate(-22.35deg) scale(1.0172, 0.9802);
+    transform: translate(-6.603%, -6.018%) rotate(-22.35deg) scale(1.043, 0.9505);
   }
 }
 
