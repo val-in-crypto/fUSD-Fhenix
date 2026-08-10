@@ -11,9 +11,10 @@ import { fragmentShader, vertexShader } from "./shaders/glossyLogo";
 const BASE_ROTATION = (-25.98 * Math.PI) / 180;
 // World units across the smaller viewport edge, so larger = smaller logo. At 2.5 the mark
 // stood about 427px tall in a 689px slot and left a lot of the stage empty under it; 2.1
-// gives back roughly a fifth of that. Scaled rather than stretched — the plate is square and
-// the art is square within it, so pulling only its height would distort the mark itself.
-const VIEW = 2.1;
+// recovered that but came out heavier than the composition wanted. 2.3 sits between the two,
+// around 464px. Scaled rather than stretched — the plate is square and the art is square
+// within it, so pulling only its height would distort the mark itself.
+const VIEW = 2.3;
 // Vertical FOV. Narrow on purpose: enough foreshortening for the tilt to read as depth,
 // short of the wide-angle stretch that would fight the flat, product-shot framing.
 const FOV = 30;
