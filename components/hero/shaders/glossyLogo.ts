@@ -4,17 +4,19 @@
 // fresnel edge, a matcap env sheen, and a moving specular band. uReveal/uRotation are driven
 // from the drag + idle-spin physics in GlossyLogo.tsx.
 //
-// Why the whole plate rather than printing the note into the base glass: the dollar-glass
-// renders are a *different* asterisk from the cyan one — measured against the base with a
-// full five-parameter fit (rotation, independent X/Y scale, translation) they reach only
-// IoU 0.84, up from 0.78 as-is. That gap is arm proportion, not misalignment, so no transform
-// closes it. Compositing them into the base's silhouette therefore leaves holes at the arm
-// tips and doubled bevels — but swapping the plate outright sidesteps the whole problem,
-// because each end of the fade is a complete, finished render standing on its own.
+// The base's silhouette is the one the plate always keeps. The dollar-glass renders are a
+// *different* asterisk from the cyan one — fatter, shorter arms — so swapping the whole plate
+// made the shape itself morph as the reveal came up, which is worse than anything it bought.
+// Only the art's colour crosses over; the outline never moves.
 //
-// The cost lands in the middle of the fade instead: the silhouette shifts by ~16% between the
-// two shapes. It is brief, both shapes are cyan glass on white, and it buys the designer's
-// exact art at both ends plus a real angle change on tilt, which a flat print cannot give.
+// Sampled through a measured fit (-4.5deg, 1.068 x 0.97) that lands the art on the base as
+// closely as it will go: that puts dollar art behind 92.9% of the cyan plate, against 88.8%
+// untransformed. The remaining ~7% is arm tips, which fall back to cyan glass — the art is
+// feathered out by its own alpha there, so it reads as a tip catching the light rather than
+// as a hole.
+//
+// Both angle frames are kept and crossed on tilt, so turning the block still changes the
+// angle the note is seen through.
 
 export const vertexShader = /* glsl */ `
   varying vec2 vUv;
@@ -55,10 +57,13 @@ export const fragmentShader = /* glsl */ `
   // the feather, so the perceived terminator sits at edge + HALF_FEATHER/2.
   const float HALF_DIM = 0.10; // light just catching the outer arms
   const float HALF_BRIGHT = -0.45; // well past half, most of the plate carrying it
-  // Wider feather than the print version used. The two plates do not share a silhouette, so
-  // a hard terminator would cut a visible seam between two different arm shapes; softening it
-  // spreads that disagreement over enough distance to read as refraction.
-  const float HALF_FEATHER = 0.34;
+  const float HALF_FEATHER = 0.24;
+
+  // Fit that lands the dollar art on the cyan base. Measured by maximising how much of the
+  // base has art behind it: 92.9% here against 88.8% untransformed. Applied in image space
+  // (y down), the convention it was measured in, so the sign cannot drift.
+  const float ART_ROT = -0.0785; // -4.5deg
+  const vec2  ART_SCALE = vec2(1.068, 0.97);
 
   // Facet gate. A bevel counts as "catching" the light once its normal turns far enough
   // toward it, so the swap reads as something the glass is doing rather than a flat wipe.
@@ -70,6 +75,15 @@ export const fragmentShader = /* glsl */ `
   // shot at different angles, so crossing between them on tilt is what makes the turn read as
   // the block actually rotating rather than a texture fading up.
   const float FRAME_TILT_RANGE = 0.35;
+
+  // Into image space, transform, back out. Going through the flip explicitly rather than
+  // folding it into the rotation keeps this identical to the measurement it came from.
+  vec2 artUv(vec2 uv) {
+    vec2 p = vec2(uv.x, 1.0 - uv.y) - 0.5;
+    float c = cos(ART_ROT), s = sin(ART_ROT);
+    vec2 q = vec2(c * p.x + s * p.y, -s * p.x + c * p.y) / ART_SCALE + 0.5;
+    return vec2(q.x, 1.0 - q.y);
+  }
 
   void main() {
     vec2 uv = vUv;
@@ -100,11 +114,17 @@ export const fragmentShader = /* glsl */ `
 
     // Pick between the two angle frames on tilt sign, premultiplied — they carry their own
     // alpha and a straight mix would drag each one's transparent black into the other's edge.
-    vec4 dA = texture2D(uDollarA, uv);
-    vec4 dB = texture2D(uDollarB, uv);
+    vec2 aUv = artUv(uv);
+    vec4 dA = texture2D(uDollarA, aUv);
+    vec4 dB = texture2D(uDollarB, aUv);
     float frameMix = clamp(uRotation.y / FRAME_TILT_RANGE * 0.5 + 0.5, 0.0, 1.0);
     float frameA = mix(dA.a, dB.a, frameMix);
     vec3 frameRGB = mix(dA.rgb * dA.a, dB.rgb * dB.a, frameMix);
+    // Unpremultiply back to a plain colour, and keep the coverage separately. Sampling off
+    // the edge of the art gives alpha 0, which is what feathers the arm tips out to glass.
+    vec3 artCol = frameA > 0.001 ? frameRGB / frameA : base.rgb;
+    float artCover = smoothstep(0.05, 0.5, frameA) * step(0.0, aUv.x) * step(aUv.x, 1.0)
+                   * step(0.0, aUv.y) * step(aUv.y, 1.0);
 
     // Half-plane split along the light axis: positive on the side facing the light, negative
     // on the side turned away. Because dir counter-rotates, this boundary holds still on
@@ -122,12 +142,10 @@ export const fragmentShader = /* glsl */ `
     // simply sits at HALF_DIM, which still lights the outer arms.
     float reveal = lightMask * mix(1.0, facet, FACET_MIX) * uDollarMix;
 
-    // Premultiplied all the way through. The two plates disagree on silhouette by ~16%, so
-    // over that margin one side is transparent while the other is not — exactly where a
-    // straight RGBA mix pulls the empty side's black into the result and fringes the arms.
-    float outA = mix(base.a, frameA, reveal);
-    vec3 outRGB = mix(base.rgb * base.a, frameRGB, reveal);
-    vec3 col = outA > 0.001 ? outRGB / outA : vec3(0.0);
+    // Colour only. Alpha stays the base's throughout, so the outline never moves — swapping
+    // it for the art's made the arms visibly change shape as the reveal came up.
+    vec3 col = mix(base.rgb, artCol, reveal * artCover);
+    float outA = base.a;
 
     // matcap env sheen from the perturbed normal — subtle at rest, blooms with velocity
     vec2 mUv = n.xy * 0.5 + 0.5 + vec2(sin(ang), cos(ang)) * 0.1;
@@ -138,8 +156,6 @@ export const fragmentShader = /* glsl */ `
     float spec = smoothstep(0.985, 1.0, sin((uv.x + uv.y) * 6.0 - uTime * 1.2) * 0.5 + 0.5);
     col += spec * fres * 0.5;
 
-    // Discard on the composite, not on the base: the dollar frames reach past the cyan plate
-    // in places, and testing base.a alone would clip their arms off mid-reveal.
     if (outA < 0.005) discard;
     gl_FragColor = vec4(col, outA);
   }
