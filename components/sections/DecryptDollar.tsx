@@ -51,6 +51,7 @@ function Plate({ progressRef, reduced, debugProgress, onReady }: PlateProps) {
       uPlain: { value: plain },
       uCipher: { value: cipher },
       uProgress: { value: 0 },
+      uSpeed: { value: 0 },
       uScramble: { value: reduced ? 0 : 1 },
       uPlainAspect: { value: plainImg.width / plainImg.height },
       uCipherAspect: { value: cipherImg.width / cipherImg.height },
@@ -67,14 +68,38 @@ function Plate({ progressRef, reduced, debugProgress, onReady }: PlateProps) {
     [uniforms],
   );
 
-  useFrame(() => {
-    const p =
+  // Eased copy of the scroll progress. The raw signal is a step function — one value per
+  // scroll event — and the whole encrypt plays across ~480px of travel, so a single wheel
+  // notch moves it ~0.19 and the encryption front jumps rather than sweeps. Easing toward
+  // the target gives the front its own momentum and absorbs the jolts.
+  const shown = useRef(0);
+
+  useFrame((_, delta) => {
+    const target =
       debugProgress !== undefined
         ? debugProgress
         : reduced
           ? 1
           : remap(progressRef.current ?? 0);
-    uniforms.uProgress.value = p;
+
+    if (debugProgress !== undefined || reduced || !ready.current) {
+      // Debug scrubbing and reduced motion want the exact value, not an approach to it — and
+      // the first frame must snap, or loading the page already scrolled to this section would
+      // play the whole encrypt as an unrequested intro animation.
+      shown.current = target;
+      uniforms.uSpeed.value = 0;
+    } else {
+      const dt = Math.min(delta, 0.05); // clamp so a dropped frame cannot overshoot
+      // Frame-rate independent: 0.001^dt settles 99.9% in a second either way, ~0.11 per
+      // frame at 60fps. Same curve at 120fps, where a fixed per-frame factor would be twice
+      // as fast and undo the damping on exactly the machines that scroll most smoothly.
+      const k = 1 - Math.pow(0.001, dt);
+      const prev = shown.current;
+      shown.current += (target - shown.current) * k;
+      uniforms.uSpeed.value = Math.abs(shown.current - prev) / Math.max(dt, 1 / 120);
+    }
+
+    uniforms.uProgress.value = shown.current;
 
     if (!ready.current) {
       ready.current = true;
@@ -127,8 +152,12 @@ export default function DecryptDollar({ debugProgress }: { debugProgress?: numbe
     const ro = new ResizeObserver(measure);
     ro.observe(el);
 
+    // rootMargin keeps the frameloop alive just outside the viewport. Gating exactly on the
+    // edge freezes the eased progress mid-approach as the plate leaves, so it jumps to catch
+    // up the moment it comes back — the seam is most visible scrolling back up into it.
     const io = new IntersectionObserver(([e]) => setVisible(e.isIntersecting), {
-      threshold: 0.01,
+      threshold: 0,
+      rootMargin: "200px 0px",
     });
     io.observe(el);
     return () => {

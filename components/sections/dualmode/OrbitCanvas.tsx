@@ -13,9 +13,23 @@ const COIN_SRCS = [
 ];
 const TOKEN_SRC = "/assets/hero-token.png";
 
-const BASE_COIN = 56; // px baseline coin height at depth 1
-const TOKEN_SIZE = 400; // px height of the formed hero token
-const DURATION = 2.8; // seconds for a full OFF↔ON transition
+const BASE_COIN = 56; // px baseline coin height at depth 1, at the reference canvas below
+
+/**
+ * The coins scale with the canvas. Held at a flat 56px they covered 11% of the 1440 desktop
+ * field but 35% of a 320px phone — the same field three times as crowded, with each coin
+ * going from 3.9% of the canvas width to 17.5% of it.
+ *
+ * Scaled on the square root of area, so coverage stays constant rather than the count
+ * thinning out: area is what crowding is measured in, and a linear scale would overshoot.
+ * The floor stops them shrinking into specks on the narrowest phones, where strict
+ * proportion would put them at 0.44 and cost more in legibility than it gains in space.
+ */
+const REF_AREA = 1440 * 787; // the desktop stage the 56px baseline was drawn for
+const COIN_SCALE_MIN = 0.55;
+const TOKEN_SIZE = 400; // px height of the formed hero token, at the desktop stage's size
+const TOKEN_HEADROOM = 16; // px kept clear above the token when the canvas forces it smaller
+const DURATION = 1.5; // seconds for a full OFF↔ON transition
 
 /** Deterministic pseudo-random in [0,1) — no Math.random, so the field is identical every
  *  mount (§A3: "deterministic, not random"). */
@@ -75,12 +89,71 @@ export default function OrbitCanvas({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const imgs = COIN_SRCS.map((src) => {
+    // Pre-scale each coin once, on load. The sources are ~230px tall and are drawn near
+    // 56px, so the old path asked the rasteriser to filter a 4x downscale eighty times a
+    // frame. Baking them to roughly their on-screen footprint makes each draw close to a
+    // blit. Sized for the largest a coin ever gets (BASE_COIN x max sizeVar x max frontness)
+    // at the dpr cap, so they are never upscaled.
+    const SPRITE_H = Math.round(BASE_COIN * 1.5 * 2);
+    // Blur ladder, in sprite-space px, baked once per coin. Doing it here rather than with
+    // ctx.filter in the loop is the whole point: filter applies per draw call, so blurring
+    // live would put a real gaussian on eighty draws a frame. Picking a pre-blurred sprite
+    // costs nothing. Five steps is enough that the change tracks the spiral without the
+    // jumps between them reading, given the coins are also accelerating and fading by then.
+    const BLUR_STEPS = [0, 1.5, 3.5, 6, 9];
+    // Room for the blur to spread into instead of clipping at the sprite's edge.
+    const BLUR_PAD = 14;
+
+    type Sprite = { levels: HTMLCanvasElement[]; aspect: number; padScale: number };
+    const sprites: (Sprite | undefined)[] = [];
+
+    const bake = (im: HTMLImageElement, idx: number) => {
+      if (!im.complete || im.naturalWidth === 0) return;
+      const a = im.naturalWidth / im.naturalHeight;
+      const w = Math.max(1, Math.round(SPRITE_H * a));
+      const h = SPRITE_H;
+      const levels = BLUR_STEPS.map((blur) => {
+        const off = document.createElement("canvas");
+        off.width = w + BLUR_PAD * 2;
+        off.height = h + BLUR_PAD * 2;
+        const c2 = off.getContext("2d");
+        if (!c2) return off;
+        // Unsupported filter is simply ignored, which degrades to an unblurred coin.
+        if (blur > 0) c2.filter = `blur(${blur}px)`;
+        c2.drawImage(im, BLUR_PAD, BLUR_PAD, w, h);
+        return off;
+      });
+      sprites[idx] = {
+        levels,
+        // Of the padded canvas, not the coin — the padding has to be drawn to scale or the
+        // blur would be squeezed back into the coin's own footprint.
+        aspect: (w + BLUR_PAD * 2) / (h + BLUR_PAD * 2),
+        padScale: (h + BLUR_PAD * 2) / h,
+      };
+    };
+
+    COIN_SRCS.forEach((src, idx) => {
       const im = new Image();
+      im.onload = () => bake(im, idx);
       im.src = src;
-      return im;
+      if (im.complete) bake(im, idx);
     });
+
+    // Bake the token the same way, and for a second reason: it is a 900x900 PNG whose first
+    // draw lands on the exact frame the token appears. Decoding and rasterising it there
+    // costs a frame precisely at the moment the eye is on it, which is the hitch in the
+    // hand-off. Doing it once up front means that frame is just a blit.
+    let tokenSprite: { canvas: HTMLCanvasElement; aspect: number } | undefined;
     const token = new Image();
+    token.onload = () => {
+      if (token.naturalWidth === 0) return;
+      const aspect = token.naturalWidth / token.naturalHeight;
+      const off = document.createElement("canvas");
+      off.height = Math.round(TOKEN_SIZE * 1.05 * 2); // max scale (breathing) x dpr cap
+      off.width = Math.max(1, Math.round(off.height * aspect));
+      off.getContext("2d")?.drawImage(token, 0, 0, off.width, off.height);
+      tokenSprite = { canvas: off, aspect };
+    };
     token.src = TOKEN_SRC;
 
     const coins: Coin[] = Array.from({ length: count }, (_, i) => ({
@@ -92,6 +165,20 @@ export default function OrbitCanvas({
       selfRot: rand(i, 5) * Math.PI * 2,
       selfRotSpeed: (rand(i, 6) - 0.5) * 0.5,
     }));
+
+    // Scratch buffers, allocated once. The render loop must not allocate: the old path built
+    // a fresh array of `count` objects with .map() and then sorted a second array off it,
+    // every frame — around five thousand short-lived objects a second at 80 coins and 60fps.
+    // That much GC churn is exactly what reads as stutter in an otherwise cheap 2D canvas.
+    const oX = new Float32Array(count);
+    const oY = new Float32Array(count);
+    const oScale = new Float32Array(count);
+    const oAlpha = new Float32Array(count);
+    const oFront = new Float32Array(count);
+    const order = new Uint16Array(count);
+    for (let i = 0; i < count; i++) order[i] = i;
+    // Sorts the index array in place against oFront — painter's order without a new array.
+    const byFront = (a: number, b: number) => oFront[a] - oFront[b];
 
     let w = 0;
     let h = 0;
@@ -114,17 +201,24 @@ export default function OrbitCanvas({
     });
     io.observe(canvas);
 
-    const drawToken = (cx: number, cy: number, scale: number, rot: number, alpha: number) => {
-      if (!token.complete || token.naturalWidth === 0 || alpha <= 0) return;
-      const aspect = token.naturalWidth / token.naturalHeight;
-      const dh = TOKEN_SIZE * scale;
-      const dw = dh * aspect;
-      ctx.save();
+    const drawToken = (
+      cx: number,
+      cy: number,
+      size: number,
+      scale: number,
+      rot: number,
+      alpha: number,
+    ) => {
+      if (!tokenSprite || alpha <= 0) return;
+      const dh = size * scale;
+      const dw = dh * tokenSprite.aspect;
+      const cos = Math.cos(rot);
+      const sin = Math.sin(rot);
       ctx.globalAlpha = clamp01(alpha);
-      ctx.translate(cx, cy);
-      ctx.rotate(rot);
-      ctx.drawImage(token, -dw / 2, -dh / 2, dw, dh);
-      ctx.restore();
+      ctx.setTransform(dpr * cos, dpr * sin, -dpr * sin, dpr * cos, dpr * cx, dpr * cy);
+      ctx.drawImage(tokenSprite.canvas, -dw / 2, -dh / 2, dw, dh);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.globalAlpha = 1;
     };
 
     const render = (dt: number, prog: number, elapsed: number) => {
@@ -135,46 +229,73 @@ export default function OrbitCanvas({
       const cy = h / 2;
       const rxMax = w * 0.46;
       const ryMax = h * 0.46;
+      const coinScale = Math.min(1, Math.max(COIN_SCALE_MIN, Math.sqrt((w * h) / REF_AREA)));
       const tokenBottom = mergeRef.current != null ? mergeRef.current : cy + TOKEN_SIZE / 2;
-      const tokenCenterY = tokenBottom - TOKEN_SIZE / 2;
+      // TOKEN_SIZE is the design value, taken off the 787px-tall desktop stage where there
+      // happens to be room for it above the toggle. Mobile has far less: on a 390x560 canvas
+      // the merge line sits at y=181, so a fixed 400 put 219px of the token — 55% of it —
+      // above the top edge, and it was wider than the canvas besides. Fit it to whichever
+      // constraint actually binds. The floor keeps it from collapsing on a very short canvas.
+      const tokenSize = Math.max(
+        96,
+        Math.min(TOKEN_SIZE, w * 0.9, tokenBottom - TOKEN_HEADROOM),
+      );
+      const tokenCenterY = tokenBottom - tokenSize / 2;
 
-      const spiral = easeInOutCubic(clamp01(prog / 0.6)); // coils in over the first 60%
-      const tok = easeOutCubic(clamp01((prog - 0.66) / 0.34)); // token forms over the last third
+      // These two overlap deliberately, 0.58 to 0.70. They used to be disjoint — the spiral
+      // finished at 0.60 and the token only began at 0.66 — leaving a beat where the coins
+      // sat piled on the merge point and nothing on screen changed. Intended as anticipation,
+      // it reads as the animation catching. Starting the token while the last coins are
+      // still closing hands off in one continuous move.
+      const spiral = easeInOutCubic(clamp01(prog / 0.7));
+      const tok = easeOutCubic(clamp01((prog - 0.58) / 0.42));
       const twist = spiral * Math.PI * 1.2; // spiral path, not straight lines
       const speedUp = 1 + spiral * 1.6;
       const coinAlpha = 1 - tok;
 
       if (coinAlpha > 0.01) {
-        const list = coins.map((c) => {
+        for (let i = 0; i < count; i++) {
+          const c = coins[i];
           if (!reduced && dt > 0) {
             c.ang += c.angSpeed * dt * speedUp;
             c.selfRot += c.selfRotSpeed * dt;
           }
           const a = c.ang + twist;
-          const orbitX = cx + Math.cos(a) * rxMax * c.fr;
-          const orbitY = cy + Math.sin(a) * ryMax * c.fr;
-          const x = mix(orbitX, cx, spiral); // converge to centre-x
-          const y = mix(orbitY, tokenCenterY, spiral); // …and up to the token point
           const frontness = (Math.sin(a) + 1) / 2;
-          const scale = (0.5 + 0.6 * frontness) * c.sizeVar;
-          const alpha = (0.4 + 0.6 * frontness) * coinAlpha;
-          return { c, x, y, frontness, scale, alpha };
-        });
-        list.sort((a, b) => a.frontness - b.frontness);
-
-        for (const it of list) {
-          const im = imgs[it.c.img];
-          if (!im.complete || im.naturalWidth === 0) continue;
-          const aspect = im.naturalWidth / im.naturalHeight;
-          const dh = BASE_COIN * it.scale;
-          const dw = dh * aspect;
-          ctx.save();
-          ctx.globalAlpha = clamp01(it.alpha);
-          ctx.translate(it.x, it.y);
-          ctx.rotate(it.c.selfRot);
-          ctx.drawImage(im, -dw / 2, -dh / 2, dw, dh);
-          ctx.restore();
+          oX[i] = mix(cx + Math.cos(a) * rxMax * c.fr, cx, spiral); // converge to centre-x
+          oY[i] = mix(cy + Math.sin(a) * ryMax * c.fr, tokenCenterY, spiral); // …and up
+          oFront[i] = frontness;
+          oScale[i] = (0.5 + 0.6 * frontness) * c.sizeVar;
+          oAlpha[i] = (0.4 + 0.6 * frontness) * coinAlpha;
         }
+        order.sort(byFront);
+
+        // Blur tracks the spiral, so the coins are crisp while they orbit and smear into a
+        // soft mass as they compress — which is what lets them dissolve into the token
+        // instead of eighty hard edges vanishing under it.
+        const blurIdx = Math.min(
+          BLUR_STEPS.length - 1,
+          Math.round(spiral * (BLUR_STEPS.length - 1)),
+        );
+
+        for (let k = 0; k < count; k++) {
+          const i = order[k];
+          const sprite = sprites[coins[i].img];
+          if (!sprite) continue;
+          const dh = BASE_COIN * coinScale * oScale[i] * sprite.padScale;
+          const dw = dh * sprite.aspect;
+          const rot = coins[i].selfRot;
+          const cos = Math.cos(rot);
+          const sin = Math.sin(rot);
+          ctx.globalAlpha = clamp01(oAlpha[i]);
+          // setTransform rather than save/translate/rotate/restore. Eighty save/restore
+          // pairs a frame is the other half of the cost — each one snapshots the whole 2D
+          // state, and none of it needs preserving between coins.
+          ctx.setTransform(dpr * cos, dpr * sin, -dpr * sin, dpr * cos, dpr * oX[i], dpr * oY[i]);
+          ctx.drawImage(sprite.levels[blurIdx], -dw / 2, -dh / 2, dw, dh);
+        }
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.globalAlpha = 1;
       }
 
       if (tok > 0) {
@@ -188,7 +309,7 @@ export default function OrbitCanvas({
           floatY += -6 * Math.sin(ph); //  +6→−6→+6px
           rot += ((2 * Math.PI) / 180) * Math.sin(ph); // −2°→2°→−2°
         }
-        drawToken(cx, tokenCenterY + floatY, scale, rot, tok);
+        drawToken(cx, tokenCenterY + floatY, tokenSize, scale, rot, tok);
       }
     };
 
@@ -201,7 +322,10 @@ export default function OrbitCanvas({
       raf = requestAnimationFrame(frame);
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
-      if (!visible) return;
+      // The desktop and mobile trees are both in the DOM; one is display:none and measures
+      // 0x0. Without the size test that twin still ran the whole simulation every frame
+      // against a canvas nobody can see — the other canvases guard this way too.
+      if (!visible || w === 0 || h === 0) return;
       elapsed += dt;
 
       const target = onRef.current ? 1 : 0;

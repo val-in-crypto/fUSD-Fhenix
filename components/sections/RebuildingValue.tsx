@@ -35,10 +35,14 @@ export default function RebuildingValue() {
     >
       {/* ── Desktop stage ─────────────────────────────────────────────────── */}
       <div className="relative mx-auto hidden h-[600px] w-full max-w-[1440px] md:block">
-        {/* decrypting bill */}
+        {/* Decrypting bill. Left and width as fractions of the 1440 frame (788.6 and 627.1
+            of it), so the plate stays in the right column instead of running past the stage
+            — as frozen px it overhung by 316px at 1100, and this section does not clip, so
+            that became horizontal scroll on the whole page. Height follows the width to keep
+            the bill's proportions rather than stretching it. */}
         <div
           className="absolute"
-          style={{ left: 788.6, top: 120, width: 627.1, height: 296.5 }}
+          style={{ left: "54.764%", top: 120, width: "43.549%", aspectRatio: "627.1 / 296.5" }}
         >
           <DecryptDollar />
         </div>
@@ -63,9 +67,11 @@ export default function RebuildingValue() {
           <WaitlistPill />
         </div>
 
+        {/* Right-column caption, anchored from the right so it tracks the edge rather than
+            drifting off it. 1440 - (1068 + 332) = 40, matching the left margin. */}
         <p
           className="absolute font-mono uppercase text-mono-muted"
-          style={{ left: 1068, top: 431, width: 332, ...CAPTION_STYLE }}
+          style={{ right: 40, top: 431, width: "23.056%", ...CAPTION_STYLE }}
         >
           {CAPTION}
         </p>

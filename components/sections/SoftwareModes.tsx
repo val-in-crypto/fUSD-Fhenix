@@ -10,19 +10,20 @@ import DissolveHeadline from "./dualmode/DissolveHeadline";
  * Figma 85:2 "Software has modes. Money never got one" — Animation 3.
  *
  * On enter: the headline dissolves char-by-char while ~80 orbiting coins spiral inward and
- * merge into the hero token; the Dual Mode toggle then flips OFF→ON as the cyan glow blooms.
- * Timeline lives in ./dualmode/sequence.ts; the canvas runs the coin/token motion, this
- * controller fires the DOM beats (dissolve trigger, toggle, glow) on the same clock.
+ * merge into the hero token; the Dual Mode toggle then flips OFF→ON. The cyan field behind
+ * them holds steady throughout — see Glow. Timeline lives in ./dualmode/sequence.ts; the
+ * canvas runs the coin/token motion, this controller fires the DOM beats (dissolve trigger,
+ * toggle) on the same clock.
  *
- * Reduced motion: no sequence — the settled hero token, toggle ON, and steady glow render
- * straight away. The headline text is always real DOM (aria-label) for screen readers.
+ * Reduced motion: no sequence — the settled hero token and toggle ON render straight away.
+ * The headline text is always real DOM (aria-label) for screen readers.
  */
 
-const GLOW_EASE = "cubic-bezier(0.16, 1, 0.3, 1)";
-
 /** Drives the section's two states via the toggle. Auto-plays the reveal once on enter;
- *  after that `toggle` flips between orbit (OFF) and merged token (ON), reversibly. */
-function useSequence() {
+ *  after that `toggle` flips between orbit (OFF) and merged token (ON), reversibly.
+ *  `mergeGap` is the clearance between the formed token's bottom and the toggle — it sets
+ *  how much room the token has, so phones run a tighter one. */
+function useSequence(mergeGap = 48) {
   const reduced = useReducedMotion();
   const rootRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLDivElement>(null);
@@ -35,7 +36,7 @@ function useSequence() {
     const measure = () => {
       const s = rootRef.current?.getBoundingClientRect();
       const t = toggleRef.current?.getBoundingClientRect();
-      if (s && t) setMergeBottomY(t.top - s.top - 48);
+      if (s && t) setMergeBottomY(t.top - s.top - mergeGap);
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -45,7 +46,7 @@ function useSequence() {
       ro.disconnect();
       window.removeEventListener("resize", measure);
     };
-  }, []);
+  }, [mergeGap]);
 
   useEffect(() => {
     if (reduced) {
@@ -76,18 +77,35 @@ function useSequence() {
   return { rootRef, toggleRef, on, toggle, mergeBottomY };
 }
 
-function Glow({ on, className }: { on: boolean; className?: string }) {
+/**
+ * The field the coins orbit in. Was glow-top.svg — a blurred ellipse — and is now the same
+ * token-driven radial used in the hero and on the compare cards, so the site has one way of
+ * making cyan light rather than a CSS treatment in some places and an SVG asset in others.
+ *
+ * Deliberately static. It used to bloom with the merge — scaling to 1.18 and lifting to 0.95
+ * opacity as the coins came together — which made the background swell at exactly the moment
+ * the eye should be on the token forming in front of it. Holding it still lets the merge read
+ * as the coins doing something rather than the whole section brightening.
+ *
+ * aspect-ratio reproduces the SVG's 1568x948 viewBox, so the width classes at the call sites
+ * still size it.
+ */
+function Glow({ className }: { className?: string }) {
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src="/assets/glow-top.svg"
-      alt=""
+    <div
       aria-hidden="true"
-      className={`pointer-events-none absolute left-1/2 top-1/2 max-w-none select-none ${className ?? ""}`}
+      className={`pointer-events-none absolute left-1/2 top-1/2 max-w-none -translate-x-1/2 -translate-y-1/2 select-none ${className ?? ""}`}
       style={{
-        transform: `translate(-50%, -50%) scale(${on ? 1.18 : 1})`,
-        opacity: on ? 0.95 : 0.68,
-        transition: `transform 900ms ${GLOW_EASE}, opacity 900ms ${GLOW_EASE}`,
+        aspectRatio: "1568 / 948",
+        // closest-side puts the ellipse's radii on the box's own half-width and half-height,
+        // so it fills the box whatever width the call site gives it.
+        background:
+          "radial-gradient(closest-side, " +
+          "color-mix(in srgb, var(--glow-cyan) 62%, transparent) 0%, " +
+          "color-mix(in srgb, var(--glow-cyan) 44%, transparent) 38%, " +
+          "color-mix(in srgb, var(--glow-cyan) 16%, transparent) 68%, " +
+          "transparent 100%)",
+        opacity: 0.68,
       }}
     />
   );
@@ -107,7 +125,9 @@ const HEADLINE_MOBILE = {
 
 export default function SoftwareModes() {
   const desktop = useSequence();
-  const mobile = useSequence();
+  // Tighter clearance on phones — 48px is a lot of the room the token has there, and every
+  // pixel of it comes straight off the token's size.
+  const mobile = useSequence(24);
 
   return (
     <section
@@ -120,7 +140,7 @@ export default function SoftwareModes() {
         className="relative mx-auto hidden w-full max-w-[1440px] overflow-hidden md:block"
         style={{ height: 787 }}
       >
-        <Glow on={desktop.on} className="w-[1280px]" />
+        <Glow className="w-[88.9%]" />
         <OrbitCanvas
           count={80}
           on={desktop.on}
@@ -136,12 +156,18 @@ export default function SoftwareModes() {
       </div>
 
       {/* ── Mobile ────────────────────────────────────────────────────────── */}
+      {/* Centred, so the headline sits in the middle of the coin field the way it does on
+          desktop. It was not centred before — the stage was not a flex column, so the content
+          just started after the top padding at y=80 and left 282px of a 560px section empty
+          underneath. That both pushed the copy above the coins and starved the token, which
+          has to fit above the toggle and had only 181px to do it in. Centring fixes both at
+          once without moving the copy out of the coins. */}
       <div
         ref={mobile.rootRef}
-        className="relative overflow-hidden px-6 py-20 md:hidden"
+        className="relative flex flex-col justify-center overflow-hidden px-6 py-16 md:hidden"
         style={{ minHeight: 560 }}
       >
-        <Glow on={mobile.on} className="w-[760px]" />
+        <Glow className="w-[760px]" />
         <OrbitCanvas
           count={40}
           on={mobile.on}
@@ -150,8 +176,11 @@ export default function SoftwareModes() {
         />
         <div className="relative flex flex-col items-center justify-center gap-10 text-center">
           <DissolveHeadline play={mobile.on} className="font-display text-ink" style={HEADLINE_MOBILE} />
+          {/* 0.65 of the Figma size on phones, giving a 96x44 control. 44px is the floor
+              here, not a coincidence — it is the minimum comfortable touch target, so this
+              is as small as the switch can go without becoming fiddly to hit. */}
           <div ref={mobile.toggleRef}>
-            <ModeToggle on={mobile.on} onClick={mobile.toggle} />
+            <ModeToggle on={mobile.on} onClick={mobile.toggle} scale={0.65} />
           </div>
         </div>
       </div>

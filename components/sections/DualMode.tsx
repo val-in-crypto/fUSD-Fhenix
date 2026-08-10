@@ -40,21 +40,33 @@ const CARDS: CompareCard[] = [
 function CompareCard({ card, absolute }: { card: CompareCard; absolute?: boolean }) {
   return (
     <div
-      className="relative overflow-hidden rounded-[24px] bg-white/10"
+      className="compare-card relative overflow-hidden rounded-[24px] bg-white/10"
       style={{
-        boxShadow: "0px 4px 4px 0px rgba(0,0,0,0.1)",
         height: absolute ? 294 : undefined,
         minHeight: absolute ? undefined : 260,
       }}
     >
-      {/* inner cyan glow, bottom-right */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/assets/card-glow.svg"
-        alt=""
+      {/* Cyan pooling into the bottom-right corner, fading up the right edge and along the
+          bottom. Replaces card-glow.svg, which was a blurred ellipse centred at (492, 255)
+          of a 580x294 card — a hot spot sitting inside the card rather than light gathering
+          in its corner, and fixed at 560px wide however the card was sized.
+          Anchored at the corner and measured in card-relative units, so it holds its shape
+          on both the 580px desktop card and the narrower mobile one. Sampled against the
+          card: 0.24 in the corner, 0.10 up the right edge, 0.06 along the bottom, and
+          effectively nothing on the copy — 0.007 at the body, 0 at the title and label.
+          Only the stops carry the brightness; the geometry above is what shapes it, so the
+          two are independent to tune.
+          Built from --glow-cyan via color-mix so it tracks the token. */}
+      <div
         aria-hidden="true"
-        className="pointer-events-none absolute w-[560px] max-w-none -translate-x-1/2 select-none"
-        style={{ left: "calc(50% + 202px)", top: 180 }}
+        className="compare-card-glow pointer-events-none absolute inset-0 select-none"
+        style={{
+          background:
+            "radial-gradient(70% 95% at 100% 100%, " +
+            "color-mix(in srgb, var(--glow-cyan) 24%, transparent) 0%, " +
+            "color-mix(in srgb, var(--glow-cyan) 11%, transparent) 45%, " +
+            "transparent 100%)",
+        }}
       />
       <div className="relative" style={{ padding: `30px ${card.padX}px` }}>
         <p
@@ -121,15 +133,28 @@ export default function DualMode() {
           alt=""
           aria-hidden="true"
           className="pointer-events-none absolute select-none"
-          style={{ left: 1080, top: 0, width: 172, height: 258 }}
+          // 1440 - (1080 + 172) = 188 from the right edge; as a left offset it drifted
+          // toward the copy as the stage narrowed.
+          style={{ right: 188, top: 0, width: 172, height: 258 }}
         />
 
-        <div className="absolute" style={{ left: 40, top: 2993 - SECTION_TOP, width: 580 }}>
+        {/* The two cards as fractions of the 1440 frame rather than frozen px. At 40/820 with
+            a fixed 580 width the right-hand card overhung by 300px at 1100, and this section
+            does not clip, so that became horizontal scroll across the whole page. The pair
+            keeps its Figma proportions — 40.28% wide each, with the same 40px outer margins
+            and the 200px gutter between them scaling with the stage. */}
+        <div
+          className="absolute"
+          style={{ left: "2.778%", top: 2993 - SECTION_TOP, width: "40.278%" }}
+        >
           <Reveal delay={MOTION.stagger * 2}>
             <CompareCard card={CARDS[0]} absolute />
           </Reveal>
         </div>
-        <div className="absolute" style={{ left: 820, top: 2993 - SECTION_TOP, width: 580 }}>
+        <div
+          className="absolute"
+          style={{ left: "56.944%", top: 2993 - SECTION_TOP, width: "40.278%" }}
+        >
           <Reveal delay={MOTION.stagger * 3}>
             <CompareCard card={CARDS[1]} absolute />
           </Reveal>

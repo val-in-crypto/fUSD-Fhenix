@@ -206,6 +206,91 @@ body {
   }
 }
 
+/* ── Dual-mode comparison cards — hover ───────────────────────────────────────
+   DualMode renders on the server, so this stays pure CSS rather than pulling the
+   section into a client component for one interaction.
+
+   The card lifts and its corner glow swells, so the pair reads as the surface
+   catching more light rather than as the card switching state. The rest shadow
+   lives here too — it used to be inline on the element, where it would have won
+   over the hover rule regardless of specificity. */
+.compare-card {
+  box-shadow: 0 4px 4px 0 rgba(0, 0, 0, 0.1);
+  transition:
+    transform 300ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.compare-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px -10px rgba(1, 22, 35, 0.18);
+}
+
+/* Scaled from the corner it is anchored to, so the pool grows along the two edges
+   it already touches instead of drifting into the middle of the card. The card
+   clips, so the overflow past the corner costs nothing. */
+.compare-card-glow {
+  transform-origin: 100% 100%;
+  transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.compare-card:hover .compare-card-glow {
+  transform: scale(1.2);
+}
+
+/* Reduced motion keeps the shadow — it is a state change, not movement — and
+   drops the travel and the swell. */
+@media (prefers-reduced-motion: reduce) {
+  .compare-card,
+  .compare-card-glow {
+    transition: none;
+  }
+  .compare-card:hover,
+  .compare-card:hover .compare-card-glow {
+    transform: none;
+  }
+}
+
+/* ── Footer headline — hover ──────────────────────────────────────────────────
+   Two things animate: the 30% rest opacity, and the gradient's middle stop.
+
+   Rest opacity lives here rather than in the gradient's alpha, which composites
+   the same over the white footer but leaves a property that can actually move.
+
+   The middle stop is the Figma gradient's #067476, a dark teal, so at full
+   strength the line reads bright/dark/bright rather than cyan. It is declared
+   through a registered custom property because a raw gradient cannot be
+   transitioned at all — background-image does not interpolate — whereas a
+   property registered as <color> does. On hover it runs up to the cyan token so
+   the whole line lands on one colour.
+
+   Where @property is unsupported the var still resolves and the rest state is
+   unchanged; only the mid-stop animation is lost. */
+@property --live-mid {
+  syntax: "<color>";
+  inherits: false;
+  initial-value: #067476;
+}
+
+.live-headline {
+  --live-mid: #067476;
+  opacity: 0.3;
+  transition:
+    opacity 300ms cubic-bezier(0.16, 1, 0.3, 1),
+    --live-mid 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.live-headline:hover {
+  --live-mid: var(--glow-cyan);
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-headline {
+    transition: none;
+  }
+}
+
 body {
   margin: 0;
   background: var(--bg);

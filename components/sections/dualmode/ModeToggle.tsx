@@ -11,18 +11,35 @@
  */
 const EASE = "cubic-bezier(0.65, 0, 0.35, 1)"; // easeInOutCubic
 
+/**
+ * Figma geometry at full size. The knob's travel is deliberately not listed: it is whatever
+ * the track has left over once the knob and its two insets are taken out, so scaling cannot
+ * leave the knob stopping short of the end or running past it.
+ */
+const DESIGN = { w: 148, h: 68, knob: 54, inset: 7, dot: 8, dotTop: 12, dotRight: 14 };
+
 export default function ModeToggle({
   on,
   onClick,
   animate = true,
+  scale = 1,
   className,
 }: {
   on: boolean;
   onClick?: () => void;
   animate?: boolean;
+  /** 1 = the Figma size. Phones run smaller — see SoftwareModes. */
+  scale?: number;
   className?: string;
 }) {
   const t = animate ? `500ms ${EASE}` : "0ms";
+  const px = (v: number) => Math.round(v * scale);
+  const w = px(DESIGN.w);
+  const h = px(DESIGN.h);
+  const knob = px(DESIGN.knob);
+  const inset = px(DESIGN.inset);
+  const travel = w - knob - inset * 2;
+
   return (
     <button
       type="button"
@@ -36,13 +53,15 @@ export default function ModeToggle({
         display: "block",
         border: "none",
         padding: 0,
-        width: 148,
-        height: 68,
+        width: w,
+        height: h,
         borderRadius: 999,
         background: on ? "var(--glow-cyan)" : "#d7dde0",
+        // Shadows scale with the switch — held at full size they read as a much heavier
+        // drop under a smaller control.
         boxShadow: on
-          ? "0 10px 34px -6px rgba(10,217,220,0.65), inset 0 1px 2px rgba(255,255,255,0.4)"
-          : "0 4px 14px rgba(0,0,0,0.12), inset 0 1px 2px rgba(255,255,255,0.5)",
+          ? `0 ${px(10)}px ${px(34)}px ${px(-6)}px rgba(10,217,220,0.65), inset 0 1px 2px rgba(255,255,255,0.4)`
+          : `0 ${px(4)}px ${px(14)}px rgba(0,0,0,0.12), inset 0 1px 2px rgba(255,255,255,0.5)`,
         transition: `background ${t}, box-shadow ${t}`,
       }}
     >
@@ -51,10 +70,10 @@ export default function ModeToggle({
         aria-hidden="true"
         style={{
           position: "absolute",
-          top: 12,
-          right: 14,
-          width: 8,
-          height: 8,
+          top: px(DESIGN.dotTop),
+          right: px(DESIGN.dotRight),
+          width: px(DESIGN.dot),
+          height: px(DESIGN.dot),
           borderRadius: "50%",
           background: "#ffffff",
           opacity: on ? 0.9 : 0.35,
@@ -66,14 +85,14 @@ export default function ModeToggle({
         aria-hidden="true"
         style={{
           position: "absolute",
-          top: 7,
-          left: 7,
-          width: 54,
-          height: 54,
+          top: inset,
+          left: inset,
+          width: knob,
+          height: knob,
           borderRadius: "50%",
           background: "linear-gradient(180deg, #ffffff 0%, #eef1f2 100%)",
-          boxShadow: "0 6px 14px rgba(0,0,0,0.28), inset 0 1px 1px rgba(255,255,255,0.9)",
-          transform: on ? "translateX(80px)" : "translateX(0)",
+          boxShadow: `0 ${px(6)}px ${px(14)}px rgba(0,0,0,0.28), inset 0 1px 1px rgba(255,255,255,0.9)`,
+          transform: on ? `translateX(${travel}px)` : "translateX(0)",
           transition: `transform ${t}`,
         }}
       />
