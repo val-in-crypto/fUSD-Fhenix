@@ -13,14 +13,15 @@
 // same reason: cross-fading two renders shot at different angles puts two outlines on screen at
 // once, which has been reported as a double asterisk more than once.
 //
-// The plate rests as plain cyan glass and fades the note in under the pointer. Both states are
-// built from this one render — the rest state is it with its print lifted out — so there is a
-// single silhouette throughout and a cross-fade cannot show two outlines, which is what the
-// old cyan base texture did.
+// The plate rests as cyan glass and fades the note in under the pointer, across its whole face
+// rather than behind a sweeping terminator. The cyan render is the plate throughout — its
+// outline, its alpha — and the note is colour only, so the silhouette never moves and a
+// cross-fade cannot put two outlines on screen.
 //
-// Every highlight added here is masked by the art's own luminance. The render's bright pixels
-// *are* its bevels, so that mask is in perfect register by construction — no second silhouette
-// to keep aligned, and no extra texture samples needed to find one.
+// Highlights are masked by the luminance of whatever is currently on screen, so they are in
+// register with it in both states, with no second silhouette to keep aligned. They fade out as
+// the note arrives: the render is finished art carrying its own bevels and its own light, and
+// laying a second set over it is what made the revealed state look washed.
 
 export const vertexShader = /* glsl */ `
   varying vec2 vUv;
@@ -33,8 +34,8 @@ export const vertexShader = /* glsl */ `
 export const fragmentShader = /* glsl */ `
   precision highp float;
 
-  uniform sampler2D uArt;   // the dollar-glass asterisk — the plate itself
-  uniform sampler2D uBase;  // cyan glass, sampled for colour only; the outline is always uArt's
+  uniform sampler2D uBase;  // cyan glass — the plate: its outline, its alpha, its bevels
+  uniform sampler2D uArt;   // dollar-glass, fitted in and revealed on hover; colour only
   uniform sampler2D uEnv;   // dollar bill, sampled as a matcap for live sheen
   uniform float uTime;
   uniform float uReveal;    // 0..1 pointer proximity; fades the note in, moves nothing
@@ -60,7 +61,6 @@ export const fragmentShader = /* glsl */ `
   // clamped to 0..1 on the JS side, so these are the ends of a range rather than scale factors.
   const float EDGE_REST = 0.30;
   const float EDGE_SPIN = 1.00;
-  const float EDGE_HOVER = 0.35;
 
   // Strength of the white core laid into the brightest bevels.
   const float RIM_CORE = 0.5;
@@ -72,17 +72,22 @@ export const fragmentShader = /* glsl */ `
   // moment a highlight on glass should be moving.
   const float SPEC_SPIN = 3.0;
 
-  // Fallback tint for the few pixels of the plate the cyan render does not reach. Its own
-  // measured mean, #7ce5ed.
-  const vec3 GLASS_TINT = vec3(0.486, 0.898, 0.929);
-
-  // Fit that lands the cyan render on this one. Measured the other way round originally — the
-  // plate used to be the cyan asterisk and the note was fitted onto it, at -4.5deg and
-  // 1.068 x 0.97, which put art behind 92.9% of the base. The plate is the note now, so this is
-  // that transform inverted. Applied in image space (y down), the convention it was measured
-  // in, so the sign cannot drift.
-  const float ART_ROT = -0.0785; // -4.5deg
-  const vec2  ART_SCALE = vec2(1.068, 0.97);
+  // Fit that lands the note on the plate, from a direct search over rotation, scale and
+  // translation maximising intersection-over-union of the two alphas: IoU 0.8321, against
+  // 0.7785 for leaving it alone.
+  //
+  // The plate is the cyan render and the note is fitted onto it, never the other way round.
+  // Inverting this to make the note the plate was tried and is worse than doing nothing — it
+  // scored 0.7166 — and either way the residual is real: these are different asterisks whose
+  // arms differ in proportion, so no rigid transform gets past about 0.83. Fitting the note
+  // into the plate hides that in the interior, where it is print on print; fitting the plate
+  // into the note puts it on the bevels, where it reads as edges that miss the outline.
+  //
+  // Applied in image space (y down), the convention it was measured in, so the sign cannot
+  // drift.
+  const float ART_ROT = -0.0844; // -4.834deg
+  const vec2  ART_SCALE = vec2(0.9375, 1.0156);
+  const vec2  ART_OFFSET = vec2(-0.0200, 0.0050);
 
   // Lit-end-to-dark-end falloff across the plate. uv - 0.5 reaches 0.5, so this is half the peak
   // swing. It is what keeps a fixed render from reading as a spinning sticker: the gradient is
@@ -90,10 +95,14 @@ export const fragmentShader = /* glsl */ `
   // through it rather than carrying it around with them.
   const float DEPTH_GRADIENT = 0.40;
 
-  // Inverse of the fit: into image space, scale, rotate back, out again.
-  vec2 baseUv(vec2 uv) {
-    vec2 p = (vec2(uv.x, 1.0 - uv.y) - 0.5) * ART_SCALE;
-    float c = cos(-ART_ROT), s = sin(-ART_ROT);
+  // 1 / 0.698 — the reciprocal of the cyan render's own peak alpha, so the plate lands exactly
+  // opaque at full reveal rather than approximately.
+  const float PLATE_SEAL = 1.432;
+
+  // Into image space, transform, back out — step for step as the fit was measured.
+  vec2 artUv(vec2 uv) {
+    vec2 p = (vec2(uv.x, 1.0 - uv.y) - 0.5 - ART_OFFSET) * ART_SCALE;
+    float c = cos(ART_ROT), s = sin(ART_ROT);
     vec2 q = vec2(c * p.x + s * p.y, -s * p.x + c * p.y) + 0.5;
     return vec2(q.x, 1.0 - q.y);
   }
@@ -101,13 +110,20 @@ export const fragmentShader = /* glsl */ `
   void main() {
     vec2 uv = vUv;
 
-    // The render, 1:1. No transform: the art is the plate now, so there is nothing to fit it to
-    // and nothing that can drift out of register.
-    vec4 art = texture2D(uArt, uv);
-    if (art.a < 0.005) discard;
+    // The cyan render is the plate: its outline, its alpha, its bevels. Nothing is fitted onto
+    // it that the eye reads as edge, so nothing can look out of register.
+    vec4 base = texture2D(uBase, uv);
+    if (base.a < 0.005) discard;
 
-    vec3 note = art.rgb;
-    float outA = art.a;
+    // The plate is 0.698 opaque at most, which is how the cyan render was drawn and is right
+    // for glass. It is wrong for the note: 30% of white page laid over the engraving is most of
+    // why the revealed state looked washed. So the plate closes up as the note arrives, to
+    // exactly opaque, and the correction below then resolves to the render's own colours.
+    //
+    // Scaling alpha does not move the outline. The edge ramps 0 -> 0.698 across a couple of
+    // texels either way; multiplying steepens that ramp but barely shifts where it crosses half,
+    // which is where the eye puts the edge.
+    float outA = min(1.0, base.a * mix(1.0, PLATE_SEAL, uReveal));
 
     float ang = uRotation.x;
 
@@ -119,38 +135,42 @@ export const fragmentShader = /* glsl */ `
     float lightPhase = LIGHT_ANGLE - ang;
     vec2 dir = vec2(cos(lightPhase), sin(lightPhase));
 
-    // Read off the note, not off the blend below, so the bevels sit in the same places whether
-    // the print is showing or not — only the print crosses over, never the glass.
-    float lum = dot(note, vec3(0.2126, 0.7152, 0.0722));
-    float gloss = smoothstep(GLOSS_LO, GLOSS_HI, lum);
+    // The note, fitted in. Its alpha is coverage only and never reaches the output, so the
+    // outline cannot move as it comes up; sampling off its edge gives 0, which feathers the arm
+    // tips back to glass.
+    vec2 aUv = artUv(uv);
+    vec4 art = texture2D(uArt, aUv);
+    float artCover = smoothstep(0.05, 0.5, art.a)
+      * step(0.0, aUv.x) * step(aUv.x, 1.0) * step(0.0, aUv.y) * step(aUv.y, 1.0);
 
-    // The plate at rest, taken from the cyan render's colour but never from its alpha.
+    // Un-composited against the page before it is drawn.
     //
-    // Lifting the note out of this render by luminance was tried first and does not work: its
-    // chamfers are not separable from its paper by brightness, so the plate came out as a flat
-    // cyan blob with no bevels. Sampling the real cyan glass gets its modelling back. Taking
-    // only its colour is what keeps the double asterisk away — the two are different shapes,
-    // about a fifth apart on silhouette, so if its alpha reached the output the outline would
-    // morph as the note came up. It never does; outA is the note's throughout.
-    vec2 bUv = baseUv(uv);
-    vec4 b = texture2D(uBase, bUv);
-    float inFrame = step(0.0, bUv.x) * step(bUv.x, 1.0) * step(0.0, bUv.y) * step(bUv.y, 1.0);
-    // The cyan render draws at alpha 0.7 over a white page, so compositing it against white is
-    // what makes it look the way it looked there.
-    vec3 cyan = mix(vec3(1.0), b.rgb, b.a);
-    // The fit reaches about 93% of the plate; the rest is arm tip and takes the flat tint,
-    // feathered in by the same alpha so it reads as glass rather than as a seam.
-    vec3 glass = mix(GLASS_TINT, cyan, smoothstep(0.05, 0.5, b.a) * inFrame);
+    // This plate is 0.7 opaque, so painting the note into it lays 30% of white page over the
+    // engraving and washes it out — the note came out visibly paler than the render it was
+    // taken from. Solving for the colour that *composites* to the render's own puts it back.
+    // Where the engraving is darker than the page can account for, the solution goes negative
+    // and clamps, which is the one place this cannot reach: the deepest ink lands around 0.30
+    // instead of 0.20, against 0.44 with no correction at all.
+    vec3 noteCol = clamp((art.rgb - (1.0 - outA)) / max(outA, 0.001), 0.0, 1.0);
 
     // uReveal is pointer proximity alone: the note answers hover and nothing else, so spinning
     // the plate no longer brings it up uninvited.
-    vec3 col = mix(glass, note, uReveal);
+    vec3 col = mix(base.rgb, noteCol, uReveal * artCover);
 
-    float edgeGain = EDGE_REST + EDGE_SPIN * uVelocity + EDGE_HOVER * uReveal;
+    // Read off what is actually on screen, so the highlights follow whichever image is showing
+    // and are in register with it either way.
+    float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
+    float gloss = smoothstep(GLOSS_LO, GLOSS_HI, lum);
 
-    // Body gradient. Applied before the additive terms so it shades the render itself rather
+    // Everything synthetic fades out as the note arrives. The render is finished art with its
+    // own bevels and its own light; adding a second set on top is what made the revealed state
+    // read as washed. At rest it is all still there, lighting the cyan plate.
+    float synth = 1.0 - uReveal;
+    float edgeGain = (EDGE_REST + EDGE_SPIN * uVelocity) * synth;
+
+    // Body gradient. Applied before the additive terms so it shades the plate itself rather
     // than the highlights laid on top of it.
-    col *= 1.0 + DEPTH_GRADIENT * dot(uv - 0.5, dir);
+    col *= 1.0 + DEPTH_GRADIENT * synth * dot(uv - 0.5, dir);
 
     // Matcap sheen, dispersed. The three channels leave a steep face at slightly different
     // angles, so a lit bevel fringes instead of staying white; the split widens with the same
@@ -170,7 +190,7 @@ export const fragmentShader = /* glsl */ `
     // Travelling specular band, carried by the spin as well as by time.
     float spec = smoothstep(0.985, 1.0,
       sin((uv.x + uv.y) * 6.0 - uTime * 1.2 - ang * SPEC_SPIN) * 0.5 + 0.5);
-    col += spec * gloss * (0.5 + uVelocity);
+    col += spec * gloss * (0.5 + uVelocity) * synth;
 
     gl_FragColor = vec4(col, outA);
   }

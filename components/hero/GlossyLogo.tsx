@@ -133,9 +133,9 @@ function LogoQuad({
   // for good — one existed to light a shape that is no longer the plate, the other put a second
   // outline on screen. The cyan base earns its place back as the rest state, but only ever as a
   // colour: the outline is the note's, always.
-  const [art, base, env] = useTexture([
-    "/assets/tex-dollar-a.png",
+  const [base, art, env] = useTexture([
     "/assets/tex-base.png",
+    "/assets/tex-dollar-a.png",
     "/assets/dollar.png",
   ]);
   art.colorSpace = THREE.SRGBColorSpace;
@@ -145,8 +145,8 @@ function LogoQuad({
 
   const uniforms = useMemo(
     () => ({
-      uArt: { value: art },
       uBase: { value: base },
+      uArt: { value: art },
       uEnv: { value: env },
       uTime: { value: 0 },
       uReveal: { value: 0 },
@@ -154,7 +154,7 @@ function LogoQuad({
       uVelocity: { value: 0 },
       uRotation: { value: new THREE.Vector2(0, 0) },
     }),
-    [art, base, env],
+    [base, art, env],
   );
   uniforms.uReflStrength.value = reflStrength;
 
@@ -180,7 +180,7 @@ function LogoQuad({
   // rather than "is it near the canvas". Sampled once into a small array — reading pixels per
   // pointer move would be far too slow, and 128 is finer than the arms are thin.
   const alphaMap = useMemo(() => {
-    const img = art.image as CanvasImageSource & { width?: number };
+    const img = base.image as CanvasImageSource & { width?: number };
     if (!img || !img.width) return null;
     const c = document.createElement("canvas");
     c.width = ALPHA_LOOKUP;
@@ -192,7 +192,7 @@ function LogoQuad({
     const out = new Uint8Array(ALPHA_LOOKUP * ALPHA_LOOKUP);
     for (let i = 0; i < out.length; i++) out[i] = px[i * 4 + 3];
     return out;
-  }, [art]);
+  }, [base]);
 
   // uv is fixed to the plate, so this stays correct however far the logo has spun or tilted.
   // Flipped on v: GL samples bottom-up, the 2D canvas above wrote top-down.
