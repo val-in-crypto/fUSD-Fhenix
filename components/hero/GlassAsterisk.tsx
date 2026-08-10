@@ -2,7 +2,7 @@
 
 import { Canvas, useFrame } from "@react-three/fiber";
 import { Environment, Lightformer, MeshTransmissionMaterial, useTexture } from "@react-three/drei";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import * as THREE from "three";
 import { useReducedMotion } from "@/components/motion/MotionProvider";
 import { asteriskGeometry } from "./asteriskGeometry";
@@ -19,13 +19,26 @@ import { asteriskGeometry } from "./asteriskGeometry";
  * see its header for how the arm width was pinned.
  */
 
-/** Matches the Figma resting angle for the plate's roll. */
+/** The Figma resting angle, and the phase the spin begins on. */
 const BASE_ROLL = (-22.35 * Math.PI) / 180;
-/** Seconds per revolution. The pace the shader version idled at, and slow enough to sit under
- *  the copy rather than compete with it. */
+/** Seconds per revolution. The pace the CSS spin ran at, and slow enough to sit under the copy
+ *  rather than compete with it. */
 const TURN_SECONDS = 60;
-/** A little off head-on, so the bevels catch light and the form reads as solid at rest. */
-const REST_PITCH = 0.18;
+/**
+ * A fixed three-quarter set, held while the plate spins.
+ *
+ * The turn itself is in-plane — about Z, the way the flat render turned, which is the motion
+ * that was signed off. What the geometry adds is that the plate is now lit and thick from a
+ * real angle rather than being a photograph of one, so these two hold still and only the roll
+ * moves. Spinning about Y instead swings the arms through edge-on, which reads as a coin
+ * flipping rather than an asterisk turning.
+ */
+const SET_PITCH = 0.14;
+const SET_YAW = -0.19;
+
+/** The hero's background, which is what the glass refracts. Module scope so the material does
+ *  not get a new Color object every render and rebuild its uniforms. */
+const PAGE_WHITE = new THREE.Color("#ffffff");
 
 function Plate({ reduced }: { reduced: boolean }) {
   const ref = useRef<THREE.Mesh>(null);
@@ -42,11 +55,17 @@ function Plate({ reduced }: { reduced: boolean }) {
     const t = bill.clone();
     t.colorSpace = THREE.SRGBColorSpace;
     t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
-    // ExtrudeGeometry's default UVs are the shape's own XY, so they run about -1..1. Halving
-    // and centring maps that onto the texture; the extra zoom frames Franklin rather than the
-    // note's margins.
-    t.repeat.set(0.34, 0.62);
-    t.offset.set(0.33, 0.2);
+    // ExtrudeGeometry's default UVs are the shape's own XY — raw, not normalised — so on a
+    // wafer of tip radius 0.93 they run -0.93..0.93, a span of 1.86. Offset is therefore 0.5
+    // to centre, and repeat is (region size) / 1.86 rather than anything near 1.
+    //
+    // The region is Franklin: u 0.12..0.50 of the note, v 0.05..0.95. The full note is 2.376:1
+    // against a square plate, so something has to be cropped, and the portrait is the half
+    // worth showing — the other half is the note's blank field. The two repeats are then set
+    // to put the same number of texels on each world axis (0.204 x 1024 = 209, 0.484 x 431 =
+    // 209), so the portrait is cropped rather than squashed.
+    t.repeat.set(0.204, 0.484);
+    t.offset.set(0.31, 0.5);
     t.needsUpdate = true;
     return t;
   }, [bill]);
@@ -54,11 +73,14 @@ function Plate({ reduced }: { reduced: boolean }) {
   useFrame((state) => {
     const m = ref.current;
     if (!m) return;
-    m.rotation.z = BASE_ROLL;
-    m.rotation.x = REST_PITCH;
-    // A real turn about the vertical axis. The flat version could never do this — edge-on, a
-    // picture of an asterisk has nothing to show.
-    m.rotation.y = reduced ? 0 : (state.clock.elapsedTime / TURN_SECONDS) * Math.PI * 2;
+    m.rotation.x = SET_PITCH;
+    m.rotation.y = SET_YAW;
+    // In-plane, on the spot, linear — the same turn the CSS ran, starting from the designer's
+    // resting angle. Linear because an eased spin reads as something being animated rather
+    // than something turning; geo.center() puts the pivot on the shape's own centre, so it
+    // turns without the orbit the off-centre PNG had.
+    m.rotation.z =
+      BASE_ROLL + (reduced ? 0 : (state.clock.elapsedTime / TURN_SECONDS) * Math.PI * 2);
   });
 
   return (
@@ -68,7 +90,17 @@ function Plate({ reduced }: { reduced: boolean }) {
         samples={6}
         resolution={512}
         transmission={1}
-        thickness={0.55}
+        // What the glass sees when it looks through itself. Without this it samples the scene
+        // buffer, which outside the plate is transparent black — so a material that transmits
+        // everything transmits black, and the plate renders nearly opaque and dark. The page
+        // behind it is white, so that is what it should be refracting.
+        background={PAGE_WHITE}
+        // Thin enough that the tint stays a tint. Attenuation is exponential in path length, so
+        // thickness and attenuationDistance multiply: at 0.55 against 1.6 the long diagonal
+        // through the middle came out several times denser than the arms, which is what put a
+        // dark band across the plate.
+        thickness={0.3}
+        attenuationDistance={1.1}
         ior={1.45}
         chromaticAberration={0.06}
         anisotropy={0.1}
@@ -76,12 +108,11 @@ function Plate({ reduced }: { reduced: boolean }) {
         distortion={0.15}
         distortionScale={0.3}
         temporalDistortion={0}
-        color={"#bff3f6"}
-        attenuationColor={"#3fd8de"}
-        attenuationDistance={1.6}
+        color={"#cdf6f8"}
+        attenuationColor={"#12cbd1"}
       />
       <mesh geometry={inner}>
-        <meshBasicMaterial map={billMap} transparent opacity={0.92} toneMapped={false} />
+        <meshBasicMaterial map={billMap} transparent opacity={0.7} toneMapped={false} />
       </mesh>
     </mesh>
   );
@@ -100,17 +131,27 @@ function Studio() {
   );
 }
 
+/** Cached for the page's lifetime: the answer cannot change, and each probe costs a real
+ *  WebGL context, which browsers hand out in small numbers. */
+let webglSupport: boolean | null = null;
+
 function detectWebGL(): boolean {
-  try {
-    const c = document.createElement("canvas");
-    return !!(
-      window.WebGLRenderingContext &&
-      (c.getContext("webgl2") || c.getContext("webgl"))
-    );
-  } catch {
-    return false;
+  if (webglSupport === null) {
+    try {
+      const c = document.createElement("canvas");
+      webglSupport = !!(
+        window.WebGLRenderingContext &&
+        (c.getContext("webgl2") || c.getContext("webgl"))
+      );
+    } catch {
+      webglSupport = false;
+    }
   }
+  return webglSupport;
 }
+
+/** Never fires — the value it reports is constant per environment. */
+const subscribeNever = () => () => {};
 
 export default function GlassAsterisk({
   className,
@@ -120,14 +161,20 @@ export default function GlassAsterisk({
   style?: React.CSSProperties;
 }) {
   const reduced = useReducedMotion();
-  const [mounted, setMounted] = useState(false);
-  const [webgl, setWebgl] = useState(true);
   const [visible, setVisible] = useState(true);
   const wrap = useRef<HTMLDivElement>(null);
 
+  // Server renders the fallback, the client swaps in the canvas — but as a value read straight
+  // through the render, not as state set from an effect. Setting it in an effect means a second
+  // render pass, and React now flags it: the mount is not something to synchronise *to*, it is
+  // simply a fact that differs between the two snapshots.
+  const canRender = useSyncExternalStore(
+    subscribeNever,
+    () => detectWebGL(),
+    () => false,
+  );
+
   useEffect(() => {
-    setMounted(true);
-    setWebgl(detectWebGL());
     const el = wrap.current;
     if (!el) return;
     // Off-screen the frameloop stops: a transmission material re-renders the scene into a
@@ -141,7 +188,7 @@ export default function GlassAsterisk({
     <div ref={wrap} className={className} style={style} aria-hidden="true">
       {/* The render stands in until the canvas paints, and stays for good without WebGL.
           CLAUDE.md requires the page to work without it. */}
-      {(!mounted || !webgl) && (
+      {!canRender && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src="/assets/hero-glass.png"
@@ -150,7 +197,7 @@ export default function GlassAsterisk({
         />
       )}
 
-      {mounted && webgl && (
+      {canRender && (
         <Canvas
           className="absolute inset-0"
           gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
