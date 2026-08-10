@@ -1,6 +1,7 @@
 import Socials from "@/components/ui/Socials";
 import WaitlistPill from "@/components/ui/WaitlistPill";
 import { ArrowDown, ArrowEnter } from "./icons";
+import GlassAsterisk from "./GlassAsterisk";
 
 /**
  * fUSD hero — faithful rebuild of Figma "Landing page" (94:3), top 1024px.
@@ -120,43 +121,28 @@ export default function Hero() {
           style={{ right: 40, top: "calc(50% - 3px)" }}
         />
 
-        {/* The designer's dollar-glass render, at their size and rotation, turning.
+        {/* Real geometry now, not a picture of it. Everything before this rotated a flat
+            render, which is where the fake turn, the mismatched silhouettes and the double
+            image all came from. Shape is fitted to the designer's render — see
+            ./asteriskGeometry — and the note sits inside the glass as a wafer, so the outer
+            surface refracts it and it can never appear outside the outline.
 
-            Size and rotation are the spec's: 564.15 x 599.4 of the 1440 x 1024 frame, at
-            -22.35deg. Position is not. Taken literally, (342.5, 147.42) centres the art at
-            43.4% / 43.7% of the stage, which is ~195px left and ~100px above where the logo
-            has actually sat, and puts its swept box at x=263 against a headline running to
-            x=604 — straight through the copy. Those offsets are almost certainly relative to
-            some other frame, not this one.
+            Box is the spec's 564.15 x 599.4 of the 1440 x 1024 frame, as fractions so it
+            tracks the stage. The spec's own offsets are not used: taken literally they centre
+            the art at 43.4% / 43.7%, which runs it through the headline. Centred on
+            49.03% / 55.18% instead, where the logo has actually sat.
 
-            Centred instead on 49.03% / 55.18%, which is where the logo it replaced sat. That
-            keeps the overlap with the headline to the shallow one the design has, rather than
-            burying the second line of it.
-
-            One render only. The second angle frame used to cross-fade over this one, which
-            put both on screen at half opacity through the middle of every cycle — two
-            asterisks at two different angles, overlapping. A cross-fade needs its two frames
-            near-aligned to read as one object; these are 20-odd degrees apart, so it read as
-            a double exposure.
-
-            It turns in place, and only turns. The drift built from the designer's two
-            placements used to run underneath it — a 9s translate and swell — which on top of
-            the rotation read as the plate wandering rather than spinning. Keyframes in
-            globals.css. */}
-        <div
-          aria-hidden="true"
-          className="hero-glass pointer-events-none absolute select-none"
+            The -22.35deg roll now lives in the scene as the mesh's own Z rotation, alongside
+            a real turn about Y. */}
+        <GlassAsterisk
+          className="pointer-events-none absolute select-none"
           style={{
             left: "29.442%",
             top: "25.912%",
             width: "39.177%",
             height: "58.535%",
-            transform: "rotate(-22.35deg)",
           }}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/assets/hero-glass.png" alt="" className="absolute inset-0 h-full w-full" />
-        </div>
+        />
 
         {/* ◐USD lockup */}
         <div className="absolute" style={{ left: 39, top: "2.539%" }}>
@@ -305,13 +291,7 @@ export default function Hero() {
             No rotation here — the desktop -22.35deg is part of a composition this stack does
             not reproduce, and tilting it inside a narrow column just costs width. */}
         <div className="relative mx-auto mt-4 w-full max-w-[380px] flex-1 min-h-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/assets/hero-glass.png"
-            alt=""
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 h-full w-full object-contain select-none"
-          />
+          <GlassAsterisk className="pointer-events-none absolute inset-0 select-none" />
         </div>
 
         {/* Same status line. It cannot share the CTA's row here — pill, line and socials

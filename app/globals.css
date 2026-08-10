@@ -291,50 +291,6 @@ body {
   }
 }
 
-/* ── Hero glass — the turning logo ────────────────────────────────────────────
-   The plate turns continuously, which is the interaction CLAUDE.md describes as
-   the signature of the build. 60s a revolution: the same luxury-watch pace the
-   shader version idled at (~63s), slow enough that it never competes with the
-   copy but unmistakably moving.
-
-   Starts at the spec's -22.35deg and runs a full 360 from there, so the
-   designer's resting angle is the phase the loop begins on. Linear, because an
-   eased spin reads as something being animated rather than something turning.
-
-   Turning is all it does. A second animation used to drift and swell the plate
-   underneath this one, built from the delta between the designer's two
-   placements — but on top of a rotation that reads as the whole thing wandering
-   rather than spinning in place, so it is gone.
-
-   transform-origin is the art's own centre, not the box's. The asterisk sits at
-   48% / 48.5% of its PNG, so spinning about the box centre swings it through a
-   small orbit — about 11px across at the desktop size — instead of turning on
-   the spot. */
-@keyframes hero-glass-spin {
-  from {
-    transform: rotate(-22.35deg);
-  }
-  to {
-    transform: rotate(337.65deg);
-  }
-}
-
-.hero-glass {
-  transform-origin: 48% 48.5%;
-  animation: hero-glass-spin 60s linear infinite;
-  will-change: transform;
-}
-
-/* CLAUDE.md is explicit that reduced motion gets no idle motion — and a plate
-   turning on its own is exactly that. Dropping the animation leaves the element
-   on its inline transform, the spec's resting -22.35deg, so the resting state
-   does not have to be restated here. */
-@media (prefers-reduced-motion: reduce) {
-  .hero-glass {
-    animation: none;
-  }
-}
-
 body {
   margin: 0;
   background: var(--bg);
