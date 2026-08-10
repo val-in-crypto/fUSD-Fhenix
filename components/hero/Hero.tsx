@@ -127,28 +127,18 @@ export default function Hero() {
             ./asteriskGeometry — and the note sits inside the glass as a wafer, so the outer
             surface refracts it and it can never appear outside the outline.
 
-            Straight off the spec now — 564.15 x 599.4 at 342.5 / 147.42 in the 1440 x 1024
-            frame, as fractions so it tracks the stage.
+            Box is the spec's 564.15 x 599.4 of the 1440 x 1024 frame, as fractions so it
+            tracks the stage. The spec's own offsets are not used: taken literally they centre
+            the art at 43.4% / 43.7%, which runs it through the headline. Centred on
+            49.03% / 55.18% instead, where the logo has actually sat.
 
-            The offsets were previously overridden, on the grounds that they ran the art
-            through the headline. That was true of a plate filling its box, which is what this
-            was drawing before it was sized to the render. The designer's asterisk covers 68%
-            of its frame, centred, so the paint starts ~84px inside the box on each side: at
-            1440 it clears the headline by all but a 7px sliver, and the spec is right.
-
-            Below 1440 they do meet — the headline is a fixed 564px wide while this is a
-            percentage, so the headline takes a growing share of the stage as it narrows, and
-            by 1280 the overlap is about 220 x 47px behind the tail of "dollar with yield".
-            That is the spec's composition holding at its own width and drifting off it
-            elsewhere, not a bug in the placement.
-
-            The -22.35deg roll lives in the scene as the mesh's own Z rotation, which is also
-            where the spin starts from. */}
+            The -22.35deg roll now lives in the scene as the mesh's own Z rotation, alongside
+            a real turn about Y. */}
         <GlassAsterisk
           className="pointer-events-none absolute select-none"
           style={{
-            left: "23.785%",
-            top: "14.396%",
+            left: "29.442%",
+            top: "25.912%",
             width: "39.177%",
             height: "58.535%",
           }}
