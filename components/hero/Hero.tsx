@@ -1,6 +1,7 @@
 import Socials from "@/components/ui/Socials";
 import WaitlistPill from "@/components/ui/WaitlistPill";
 import { ArrowDown, ArrowEnter } from "./icons";
+import HeroGlass from "./HeroGlass";
 
 /**
  * fUSD hero — faithful rebuild of Figma "Landing page" (94:3), top 1024px.
@@ -143,9 +144,8 @@ export default function Hero() {
             by a -14.9, -14.4px drift and a 1.7% wider / 2.0% shorter box. That delta is the
             secondary motion, on the child below; the turn itself is a full rotation. Keyframes
             in globals.css — see .hero-glass. */}
-        <div
-          aria-hidden="true"
-          className="hero-glass pointer-events-none absolute select-none"
+        <HeroGlass
+          className="absolute"
           style={{
             left: "29.442%",
             top: "25.912%",
@@ -153,15 +153,7 @@ export default function Hero() {
             height: "58.535%",
             transform: "rotate(-22.35deg)",
           }}
-        >
-          {/* Two layers because one element cannot animate transform twice — the second
-              declaration would simply replace the first. The outer turns, this one carries
-              the drift and swell, and the two compose. */}
-          <div className="hero-glass-drift absolute inset-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/assets/hero-glass.png" alt="" className="absolute inset-0 h-full w-full" />
-          </div>
-        </div>
+        />
 
         {/* ◐USD lockup */}
         <div className="absolute" style={{ left: 39, top: "2.539%" }}>
@@ -310,13 +302,7 @@ export default function Hero() {
             No rotation here — the desktop -22.35deg is part of a composition this stack does
             not reproduce, and tilting it inside a narrow column just costs width. */}
         <div className="relative mx-auto mt-4 w-full max-w-[380px] flex-1 min-h-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/assets/hero-glass.png"
-            alt=""
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 h-full w-full object-contain select-none"
-          />
+          <HeroGlass className="absolute inset-0" />
         </div>
 
         {/* Same status line. It cannot share the CTA's row here — pill, line and socials
