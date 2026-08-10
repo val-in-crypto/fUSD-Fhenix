@@ -68,22 +68,38 @@ const ALPHA_HIT = 40;
 // a full turn in ~63s (luxury-watch pace).
 const IDLE_VEL = 0.2;
 
-/** The spec verbatim: flat cyan, masked to the render's shape, at the spec's angle. aspectRatio
- *  keeps it square, since the mask is a square texture and the div has no intrinsic size. */
+/**
+ * The spec verbatim: the frosted-glass stack, masked to the render's shape, at the spec's angle.
+ *
+ * The shader composites these same layers for the canvas, so the two draw the same thing and the
+ * handoff is invisible. Kept as real CSS here rather than a screenshot of it, which is what makes
+ * the no-WebGL path the designer's own markup instead of an approximation.
+ *
+ * aspectRatio keeps it square: the mask is a square texture and a div has no intrinsic size.
+ */
+const MASK = 'url(/assets/tex-dollar-a.png) center / contain no-repeat';
+
 const FALLBACK_STYLE: React.CSSProperties = {
   transform: "rotate(-22.35deg)",
   aspectRatio: "1 / 1",
-  background: "#00F0FF",
-  WebkitMaskImage: "url(/assets/tex-dollar-a.png)",
-  WebkitMaskRepeat: "no-repeat",
-  WebkitMaskPosition: "center",
-  WebkitMaskSize: "contain",
-  maskImage: "url(/assets/tex-dollar-a.png)",
-  maskRepeat: "no-repeat",
-  maskPosition: "center",
-  maskSize: "contain",
+  background: [
+    "radial-gradient(circle at 30% 20%," +
+      " rgba(255,255,255,0.78) 0%, rgba(255,255,255,0.30) 20%, transparent 42%)",
+    "linear-gradient(145deg," +
+      " rgba(230,255,255,0.9) 0%, rgba(125,238,250,0.75) 22%," +
+      " rgba(72,206,225,0.55) 52%, rgba(185,248,255,0.8) 100%)",
+  ].join(", "),
+  WebkitMask: MASK,
+  mask: MASK,
+  backdropFilter: "blur(10px) saturate(160%)",
+  WebkitBackdropFilter: "blur(10px) saturate(160%)",
+  filter: [
+    "drop-shadow(0 3px 1px rgba(255,255,255,0.7))",
+    "drop-shadow(0 9px 5px rgba(0,210,235,0.38))",
+    "drop-shadow(0 22px 30px rgba(0,0,0,0.3))",
+  ].join(" "),
+  overflow: "hidden",
 };
-
 export type GlossyLogoProps = {
   inertiaDecay?: number;
   tiltClamp?: number; // degrees
@@ -486,7 +502,7 @@ export default function GlossyLogo(props: GlossyLogoProps) {
         // edge, which is what VIEW spans, so it stays right whichever way the box is oriented.
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 m-auto max-h-[79.07%] max-w-[79.07%] select-none"
+          className="glass-fallback pointer-events-none absolute inset-0 m-auto max-h-[79.07%] max-w-[79.07%] select-none"
           style={FALLBACK_STYLE}
         />
       )}

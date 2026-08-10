@@ -1,20 +1,26 @@
 // GLSL for the glossy fUSD logo.
 //
-// One texture, one silhouette. The plate rests as flat brand cyan in the exact shape of the
-// dollar-glass render — its alpha used as a mask, per the designer's spec — and fades the note
-// in under the pointer. Because both states come from the same PNG there is nothing to fit,
-// nothing to warp and nothing that can drift out of register.
+// One texture, one silhouette. The plate rests as the designer's frosted-glass treatment in the
+// exact shape of the dollar-glass render — that render's own alpha used as the mask, per the
+// spec — and fades the note in under the pointer. Both states come from the same PNG, so the
+// silhouette is identical by definition: nothing to fit, nothing to warp, nothing that can drift
+// out of register.
 //
 // That is worth stating, because everything before it fought this. The cyan and dollar-glass
 // renders are different asterisks whose arms differ in proportion: no rotation, scale or
 // translation gets their silhouettes past IoU 0.8321, warping one onto the other per angle
 // reaches 0.9983 but bends straight arm edges into curves and reads as melted, and the leftover
-// either way shows as arm tips the note never reaches. Masking removes the second shape rather
+// either way showed as arm tips the note never reached. Masking removes the second shape rather
 // than trying to reconcile it.
 //
-// The trade is that a flat fill has no bevels, so the rest state carries no glass modelling of
-// its own — only the body gradient below, which is what keeps the spin readable. The glass is
-// the reveal.
+// The rest state is the spec's CSS, layer for layer, composited here instead of by the browser —
+// because the plate spins and tilts, and a DOM element cannot follow a mesh. What the browser
+// would do to a stack of translucent gradients over a white page, this does in one pass.
+//
+// Two things in that CSS do not survive the move, both harmlessly. backdrop-filter blurs and
+// saturates what is behind the element, and behind this is a plain white hero, so it resolves to
+// white either way. The drop-shadows fall outside the mask, which this shader discards; they
+// would need a second pass to reproduce and are a glow around the mark rather than glass in it.
 
 export const vertexShader = /* glsl */ `
   varying vec2 vUv;
@@ -35,22 +41,33 @@ export const fragmentShader = /* glsl */ `
 
   varying vec2 vUv;
 
-  // The plate at rest, from the spec.
-  const vec3 PLATE_COLOR = vec3(0.0, 0.9412, 1.0); // #00F0FF
+  // Progress along a CSS linear-gradient axis, for a 1x1 box.
+  //
+  // CSS measures from 0deg pointing up and runs clockwise, and its gradient line is long enough
+  // that the corners land exactly on the end stops — which for a unit box is |sin| + |cos|.
+  // Getting either wrong slides every stop along the arm.
+  float gradT(vec2 p, float deg) {
+    float a = radians(deg);
+    vec2 d = vec2(sin(a), -cos(a));
+    float L = abs(d.x) + abs(d.y);
+    return clamp((dot(p - 0.5, d) + L * 0.5) / L, 0.0, 1.0);
+  }
 
-  // Where the key light sits, in screen space (radians; 0 = right, PI/2 = up). Fixed in the
-  // world — the plate turns through it, it does not travel with the plate.
-  const float LIGHT_ANGLE = 2.35; // upper-left
+  // Interpolate two stops the way CSS does: premultiplied.
+  //
+  // This matters wherever a stop fades to "transparent", which is rgba(0,0,0,0). Interpolated
+  // straight, a white stop drags toward black as it fades and the highlight goes grey. In
+  // premultiplied space it stays white and simply thins out.
+  vec4 stopMix(vec4 a, vec4 b, float t) {
+    vec4 pa = vec4(a.rgb * a.a, a.a);
+    vec4 pb = vec4(b.rgb * b.a, b.a);
+    vec4 m = mix(pa, pb, clamp(t, 0.0, 1.0));
+    return vec4(m.a > 0.0001 ? m.rgb / m.a : vec3(0.0), m.a);
+  }
 
-  // Lit-end-to-dark-end falloff across the plate. uv - 0.5 reaches 0.5, so this is half the peak
-  // swing. On a flat fill it is the only thing distinguishing one arm from another, and it is
-  // laid along the counter-rotating light axis so it holds still on screen and the arms travel
-  // through it rather than carrying it around with them.
-  const float DEPTH_GRADIENT = 0.30;
+  vec3 over(vec3 dst, vec4 src) { return mix(dst, src.rgb, src.a); }
 
-  // How much the gradient deepens with the turn, so spinning the mark reads as light moving over
-  // it rather than as a shape rotating under a fixed shade.
-  const float DEPTH_SPIN = 0.35;
+  const vec4 CLEAR = vec4(0.0);
 
   void main() {
     vec2 uv = vUv;
@@ -58,25 +75,59 @@ export const fragmentShader = /* glsl */ `
     vec4 art = texture2D(uArt, uv);
     if (art.a < 0.005) discard;
 
-    float ang = uRotation.x;
+    // Into CSS space: y down, so every angle and percentage below reads as written.
+    vec2 p = vec2(uv.x, 1.0 - uv.y);
 
-    // The key light, in plate space. uv is fixed to the plate, so a world-fixed light must
-    // rotate *backwards* against the spin — hence LIGHT_ANGLE - ang. Leave the subtraction out
-    // and the lit side rides along with the plate, so the same arms stay lit however far it
-    // turns, which reads as a pattern painted on the asterisk rather than as light it moves
-    // through.
-    float lightPhase = LIGHT_ANGLE - ang;
-    vec2 dir = vec2(cos(lightPhase), sin(lightPhase));
+    // ── background layer 2: linear-gradient(145deg, ...) ─────────────────────────
+    float t1 = gradT(p, 145.0);
+    vec4 body;
+    if (t1 < 0.22) {
+      body = stopMix(vec4(0.902, 1.000, 1.000, 0.90), vec4(0.490, 0.933, 0.980, 0.75), t1 / 0.22);
+    } else if (t1 < 0.52) {
+      body = stopMix(vec4(0.490, 0.933, 0.980, 0.75), vec4(0.282, 0.808, 0.882, 0.55), (t1 - 0.22) / 0.30);
+    } else {
+      body = stopMix(vec4(0.282, 0.808, 0.882, 0.55), vec4(0.725, 0.973, 1.000, 0.80), (t1 - 0.52) / 0.48);
+    }
 
-    // Flat cyan in the render's own shape, crossing to the render itself. uReveal is pointer
-    // proximity alone: the note answers hover and nothing else.
-    vec3 col = mix(PLATE_COLOR, art.rgb, uReveal);
+    // ── background layer 1: radial-gradient(circle at 30% 20%, ...) ──────────────
+    // No size given, so CSS sizes it farthest-corner — from (0.3, 0.2) that is (1, 1).
+    float r1 = distance(p, vec2(0.30, 0.20)) / distance(vec2(1.0, 1.0), vec2(0.30, 0.20));
+    vec4 sheen = CLEAR;
+    if (r1 < 0.20) {
+      sheen = stopMix(vec4(1.0, 1.0, 1.0, 0.78), vec4(1.0, 1.0, 1.0, 0.30), r1 / 0.20);
+    } else if (r1 < 0.42) {
+      sheen = stopMix(vec4(1.0, 1.0, 1.0, 0.30), CLEAR, (r1 - 0.20) / 0.22);
+    }
 
-    // Shading only while the plate is cyan. The render is finished art carrying its own bevels
-    // and its own light; laying a second set over it is what made the revealed state look
-    // washed, so this fades out exactly as the note arrives.
-    float synth = 1.0 - uReveal;
-    col *= 1.0 + DEPTH_GRADIENT * synth * (1.0 + DEPTH_SPIN * uVelocity) * dot(uv - 0.5, dir);
+    // ── ::before — the glossy reflection, at 0.8 layer opacity ───────────────────
+    float t2 = gradT(p, 125.0);
+    vec4 gloss = CLEAR;
+    if (t2 < 0.12) {
+      gloss = stopMix(vec4(1.0, 1.0, 1.0, 0.90), vec4(1.0, 1.0, 1.0, 0.35), t2 / 0.12);
+    } else if (t2 < 0.31) {
+      gloss = stopMix(vec4(1.0, 1.0, 1.0, 0.35), CLEAR, (t2 - 0.12) / 0.19);
+    } else if (t2 >= 0.70) {
+      gloss = stopMix(CLEAR, vec4(0.0, 0.922, 1.0, 0.28), (t2 - 0.70) / 0.30);
+    }
+    gloss.a *= 0.8;
+
+    // ── ::after — cyan depth. Its linear sits under its radial, as listed. ───────
+    float t3 = gradT(p, 160.0);
+    vec4 depth = t3 < 0.40 ? CLEAR : stopMix(CLEAR, vec4(0.0, 0.922, 1.0, 0.25), (t3 - 0.40) / 0.60);
+    float r2 = distance(p, vec2(0.60, 0.65)) / 0.55;
+    vec4 pool = r2 < 1.0 ? stopMix(vec4(0.0, 0.725, 0.843, 0.25), CLEAR, r2) : CLEAR;
+
+    // Composited over the white hero, bottom to top, which is what backdrop-filter would have
+    // resolved to anyway.
+    vec3 glass = vec3(1.0);
+    glass = over(glass, body);
+    glass = over(glass, sheen);
+    glass = over(glass, gloss);
+    glass = over(glass, depth);
+    glass = over(glass, pool);
+
+    // The note answers the pointer and nothing else.
+    vec3 col = mix(glass, art.rgb, uReveal);
 
     gl_FragColor = vec4(col, art.a);
   }
