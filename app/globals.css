@@ -291,6 +291,53 @@ body {
   }
 }
 
+/* ── Hero glass — the turn between the designer's two placements ──────────────
+   Figma gives the same layer twice at -22.35deg: 564.15x599.4 at (342.5,147.42)
+   and 573.85x587.55 at (322.75,138.92). The delta is the whole animation —
+   centre drifts -14.9,-14.4px, box goes 1.7% wider and 2.0% shorter.
+
+   Transform order is deliberate. CSS applies these right to left, so scale runs
+   first in the element's own space — which is the space Figma reports width and
+   height in for a rotated layer — then the rotation, then the drift in frame
+   space. Any other order shears the plate instead of turning it.
+
+   Drift is a percentage of the element's own box, so it tracks the stage the
+   same way the box does. 9s each way: slow enough to read as the object
+   breathing rather than as an animation playing. */
+@keyframes hero-glass-turn {
+  to {
+    transform: translate(-2.641%, -2.407%) rotate(-22.35deg) scale(1.0172, 0.9802);
+  }
+}
+
+/* The second render is a different angle, not the same picture moved. Crossing to
+   it on the same clock is what makes the drift read as a turn rather than a slide. */
+@keyframes hero-glass-cross {
+  to {
+    opacity: 1;
+  }
+}
+
+.hero-glass {
+  animation: hero-glass-turn 9s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+  will-change: transform;
+}
+
+.hero-glass-b {
+  opacity: 0;
+  animation: hero-glass-cross 9s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
+}
+
+/* CLAUDE.md is explicit that reduced motion gets no idle drift. Dropping the
+   animations leaves the element on its inline transform, which is placement A —
+   the design's resting state — so nothing has to be restated here. */
+@media (prefers-reduced-motion: reduce) {
+  .hero-glass,
+  .hero-glass-b {
+    animation: none;
+  }
+}
+
 body {
   margin: 0;
   background: var(--bg);

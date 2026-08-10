@@ -120,21 +120,22 @@ export default function Hero() {
           style={{ right: 40, top: "calc(50% - 3px)" }}
         />
 
-        {/* The designer's dollar-glass render, placed to their spec rather than reconstructed:
-            564.15 x 599.4 at (342.5, 147.42), rotated -22.35deg. Offsets and size are fractions
-            of the 1440 x 1024 frame, so the whole thing tracks the stage instead of freezing.
-            Both box dimensions come from the spec rather than letting height follow the asset.
-            They disagree by 3.5% — the export is 0.975 aspect, the box 0.941 — and honouring
-            the box is the more faithful reading of "as given"; 3.5% is not visible.
-            Sourced from hero-glass.png, the "image 3" export downscaled to 1365px wide. The raw
-            file is 6.1MB, which is a lot to spend on one hero image when the box is 564px and
-            even a 2x display only asks for ~1128. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/assets/hero-glass.png"
-          alt=""
+        {/* The designer's dollar-glass render, placed to their spec and turning between the two
+            placements they gave for it.
+
+            Both are the same layer at -22.35deg: 564.15 x 599.4 at (342.5, 147.42), and
+            573.85 x 587.55 at (322.75, 138.92). The difference between them is the motion —
+            centre drifts -14.9, -14.4px while the box goes 1.7% wider and 2.0% shorter. Wider
+            and shorter at a fixed rotation is what a flat plate does turning about a vertical
+            axis, so the second render (angle B) cross-fades in on the same clock. Position
+            alone would only slide it; the two angles are what make it read as a turn.
+
+            Box is a fraction of the 1440 x 1024 frame so it tracks the stage, and the drift is
+            a percentage of the element's own box so it scales with it. Keyframes in
+            globals.css — see .hero-glass. */}
+        <div
           aria-hidden="true"
-          className="pointer-events-none absolute max-w-none select-none"
+          className="hero-glass pointer-events-none absolute select-none"
           style={{
             left: "23.785%",
             top: "14.396%",
@@ -142,7 +143,16 @@ export default function Hero() {
             height: "58.535%",
             transform: "rotate(-22.35deg)",
           }}
-        />
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/assets/hero-glass.png" alt="" className="absolute inset-0 h-full w-full" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/assets/hero-glass-b.png"
+            alt=""
+            className="hero-glass-b absolute inset-0 h-full w-full"
+          />
+        </div>
 
         {/* ◐USD lockup */}
         <div className="absolute" style={{ left: 39, top: "2.539%" }}>
