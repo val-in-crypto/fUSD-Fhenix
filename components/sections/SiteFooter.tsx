@@ -32,15 +32,16 @@ const LIVE_TEXT_STYLE = {
 const LIVE_BASELINE_DROP = "-0.201em";
 
 /**
- * Mobile size. The line cannot wrap, so on a narrow screen it has to be sized to the space
- * rather than clamped to a floor: at 320 the old clamp's 40px minimum set 365px of text into
- * 272px of usable width and the last word was clipped away by the footer's overflow.
+ * Size, for both breakpoints. The line cannot wrap, so it has to be sized to the space rather
+ * than pinned: at the Figma 96px it sets 842px of text, which overruns its stage on anything
+ * under ~870px wide. The footer clips, so it did not scroll the page — it simply cut the ends
+ * off the line, and at 320 the last word was gone entirely.
  *
- * Measured, not guessed — this string sets 8.77x its font-size wide in Instrument Serif, so
- * dividing the padded viewport by that ratio fits it exactly. Capped at the desktop 96px so
- * it never overshoots the design on a wide phone.
+ * Measured, not guessed: this string sets 8.77x its font-size wide in Instrument Serif, so
+ * dividing the available width by that ratio fits it exactly. Holds the design's 96px wherever
+ * there is room, which is every viewport from ~870px up.
  */
-const LIVE_SIZE_MOBILE = "min(calc((100vw - 48px) / 8.77), 96px)";
+const LIVE_SIZE = "min(calc((100vw - 48px) / 8.77), 96px)";
 
 export default function SiteFooter() {
   return (
@@ -62,8 +63,8 @@ export default function SiteFooter() {
           style={{
             left: 0,
             bottom: LIVE_BASELINE_DROP,
-            fontSize: 96,
-            letterSpacing: "-0.96px",
+            fontSize: LIVE_SIZE,
+            letterSpacing: "-0.01em",
             lineHeight: 1.1,
           }}
         >
@@ -87,7 +88,7 @@ export default function SiteFooter() {
         <p
           className="font-serif uppercase whitespace-nowrap not-italic"
           style={{
-            fontSize: LIVE_SIZE_MOBILE,
+            fontSize: LIVE_SIZE,
             letterSpacing: "-0.01em",
             lineHeight: 1.1,
             marginBottom: LIVE_BASELINE_DROP,

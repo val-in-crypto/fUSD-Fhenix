@@ -220,7 +220,7 @@ export default function Hero() {
           style={{ left: "calc(75% + 7px)", top: "68.359%", height: 42 }}
         >
           <p
-            className="font-serif whitespace-nowrap text-glow-cyan"
+            className="font-serif uppercase whitespace-nowrap text-glow-cyan"
             style={{ fontSize: "clamp(18px, 2.2vw, 32px)", letterSpacing: "-0.32px", lineHeight: 0.9 }}
           >
             Live on Arbitrum soon
@@ -282,7 +282,7 @@ export default function Hero() {
             come to ~344px against 327px of content width at 375px — so it takes its own
             right-aligned line directly above, which keeps it reading as the CTA's pair. */}
         <p
-          className="relative mt-6 text-right font-serif text-glow-cyan"
+          className="relative mt-6 text-right font-serif uppercase text-glow-cyan"
           style={{ fontSize: 20, letterSpacing: "-0.2px", lineHeight: 0.9 }}
         >
           Live on Arbitrum soon
