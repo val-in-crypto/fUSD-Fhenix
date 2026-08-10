@@ -9,12 +9,19 @@ import { useReducedMotion } from "@/components/motion/MotionProvider";
 import { fragmentShader, vertexShader } from "./shaders/glossyLogo";
 
 const BASE_ROTATION = (-25.98 * Math.PI) / 180;
-// World units across the smaller viewport edge, so larger = smaller logo. At 2.5 the mark
-// stood about 427px tall in a 689px slot and left a lot of the stage empty under it; 2.1
-// recovered that but came out heavier than the composition wanted. 2.3 sits between the two,
-// around 464px. Scaled rather than stretched — the plate is square and the art is square
-// within it, so pulling only its height would distort the mark itself.
-const VIEW = 2.3;
+// World units across the smaller viewport edge, so larger = smaller logo.
+//
+// Set from the designer's render rather than by eye. In hero-glass.png the asterisk fills 72%
+// of its frame's height, and that frame is placed 599.4px tall in a 1024px stage — so the
+// mark is meant to stand about 431px, or 42% of the stage. Every value this has held was well
+// over that: 2.5 gave 64%, 2.1 gave 74%, 2.3 gave 64% again at the sizes actually measured.
+//
+// The arithmetic runs: the asterisk covers 0.91 of tex-base.png, on a 1.7 quad, so its height
+// is 1.547 / VIEW of the canvas's smaller edge. 3.5 lands it on the design's 42%.
+//
+// Scaled rather than stretched — the plate is square and the art is square within it, so
+// pulling only its height would distort the mark itself.
+const VIEW = 3.5;
 // Vertical FOV. Narrow on purpose: enough foreshortening for the tilt to read as depth,
 // short of the wide-angle stretch that would fight the flat, product-shot framing.
 const FOV = 30;
