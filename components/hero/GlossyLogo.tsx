@@ -9,7 +9,11 @@ import { useReducedMotion } from "@/components/motion/MotionProvider";
 import { fragmentShader, vertexShader } from "./shaders/glossyLogo";
 
 const BASE_ROTATION = (-25.98 * Math.PI) / 180;
-const VIEW = 2.5; // world units across the smaller viewport edge (larger = smaller logo)
+// World units across the smaller viewport edge, so larger = smaller logo. At 2.5 the mark
+// stood about 427px tall in a 689px slot and left a lot of the stage empty under it; 2.1
+// gives back roughly a fifth of that. Scaled rather than stretched — the plate is square and
+// the art is square within it, so pulling only its height would distort the mark itself.
+const VIEW = 2.1;
 // Vertical FOV. Narrow on purpose: enough foreshortening for the tilt to read as depth,
 // short of the wide-angle stretch that would fight the flat, product-shot framing.
 const FOV = 30;
@@ -30,7 +34,12 @@ const DEFAULTS = {
   // reflection outright without touching the mask tuning.
   dollarReveal: 1,
   // How far the plate leans toward the cursor on approach, as a fraction of tiltClamp.
-  hoverLean: 0.5,
+  //
+  // Off. The lean tilted the plate to face the pointer, which both moved it and foreshortened
+  // it — a mark that shifts and squashes whenever the cursor passes near it. Hover still
+  // brings the portrait up; it just no longer touches the geometry. Kept as a prop rather
+  // than deleted, so the behaviour is one number away if it is ever wanted back.
+  hoverLean: 0,
 };
 const SPIN_SENS = 0.01;
 const TILT_SENS_X = 0.002;
