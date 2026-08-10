@@ -34,7 +34,7 @@ export const vertexShader = /* glsl */ `
 export const fragmentShader = /* glsl */ `
   precision highp float;
 
-  uniform sampler2D uBase;  // clear cut glass, tinted cyan — the plate: outline, alpha, bevels
+  uniform sampler2D uBase;  // cyan glass — the plate: its outline, its alpha, its bevels
   uniform sampler2D uArt;   // dollar-glass, fitted in and revealed on hover; colour only
   uniform sampler2D uEnv;   // dollar bill, sampled as a matcap for live sheen
   uniform float uTime;
@@ -49,22 +49,13 @@ export const fragmentShader = /* glsl */ `
   // world — the plate turns through it, it does not travel with the plate.
   const float LIGHT_ANGLE = 2.35; // upper-left
 
-  // Which of the plate's own tones count as bevel, from its measured luminance rather than
-  // guessed. The clear render is a narrow band once tinted — p50 0.837, p99 0.875 — because
-  // almost all of its modelling is in the alpha rather than the colour, so this window is tight
-  // and sits high in that band. Set it by eye and it does nothing at all: the old 0.94 was above
-  // the plate's brightest pixel.
-  const float GLOSS_LO = 0.855;
-  const float GLOSS_HI = 0.875;
-
-  // Maps the clear glass onto the brand cyan. A tint rather than a repaint, so every bit of the
-  // render's contrast and highlight structure survives it.
-  //
-  // Solved for what it *composites* to, not what it starts at. Tinting the mean straight onto
-  // #7ce5ed was the first attempt and came out near-white: the plate then draws at 0.7 over a
-  // white page, which lifts it to #a4edf3. Working backwards through that gives #44dae5, which
-  // lands on #7ce5ed once the page is accounted for.
-  const vec3 PLATE_TINT = vec3(0.2881, 0.9189, 0.9662);
+  // Which of the art's own tones count as bevel. Taken from the render's actual luminance
+  // distribution rather than guessed: across its opaque pixels the median is 0.762 and the 95th
+  // percentile 0.966, so the glass edges are the top few per cent and the note's paper occupies
+  // everything below. The first pass at this used 0.62, which passed 73.5% of the plate — the
+  // paper included — and blew the whole note out. 0.94 catches the top 12%, 0.99 the top 1%.
+  const float GLOSS_LO = 0.94;
+  const float GLOSS_HI = 0.99;
 
   // How hard the highlights work, at rest and at full spin. uVelocity and uReveal are both
   // clamped to 0..1 on the JS side, so these are the ends of a range rather than scale factors.
@@ -94,9 +85,9 @@ export const fragmentShader = /* glsl */ `
   //
   // Applied in image space (y down), the convention it was measured in, so the sign cannot
   // drift.
-  const float ART_ROT = -0.2313; // -13.250deg
-  const vec2  ART_SCALE = vec2(0.9617, 1.0398);
-  const vec2  ART_OFFSET = vec2(-0.0150, 0.0303);
+  const float ART_ROT = -0.0844; // -4.834deg
+  const vec2  ART_SCALE = vec2(0.9375, 1.0156);
+  const vec2  ART_OFFSET = vec2(-0.0200, 0.0050);
 
   // Lit-end-to-dark-end falloff across the plate. uv - 0.5 reaches 0.5, so this is half the peak
   // swing. It is what keeps a fixed render from reading as a spinning sticker: the gradient is
@@ -123,7 +114,6 @@ export const fragmentShader = /* glsl */ `
     // it that the eye reads as edge, so nothing can look out of register.
     vec4 base = texture2D(uBase, uv);
     if (base.a < 0.005) discard;
-    base.rgb *= PLATE_TINT;
 
     // The plate is 0.698 opaque at most, which is how the cyan render was drawn and is right
     // for glass. It is wrong for the note: 30% of white page laid over the engraving is most of
