@@ -34,13 +34,10 @@ const DEFAULTS = {
   idleSpeed: 0.5,
   scrollReveal: 0.9, // ceiling of scroll's contribution to the reveal; 0 disables it
   idleTilt: 0.55, // fraction of tiltClamp used by the resting wobble; 0 = flat spin only
-  // Floor under the reveal, so the facets keep catching the dollar during the idle turn
-  // rather than only on a flick or a scroll. Drag and scroll still bloom above it.
-  restReveal: 0.6,
-  // Ceiling on the dollar-glass reveal, reached when the pointer is over the logo. It rests
-  // at plain cyan glass and fades the portrait in as the cursor approaches; 0 disables the
-  // reflection outright without touching the mask tuning.
-  dollarReveal: 1,
+  // Ceiling on the edge bloom reached when the pointer is over the logo or the plate is turned
+  // right off-axis. It used to gate the note; the note is always shown now, so this scales how
+  // much extra light the glass catches instead. 0 leaves the render entirely alone.
+  edgeBloom: 1,
   // How far the plate leans toward the cursor on approach, as a fraction of tiltClamp.
   //
   // Off. The lean tilted the plate to face the pointer, which both moved it and foreshortened
@@ -83,8 +80,7 @@ export type GlossyLogoProps = {
   idleSpeed?: number;
   scrollReveal?: number;
   idleTilt?: number;
-  restReveal?: number;
-  dollarReveal?: number;
+  edgeBloom?: number;
   hoverLean?: number;
 };
 
@@ -122,8 +118,7 @@ function LogoQuad({
   idleSpeed,
   scrollReveal,
   idleTilt,
-  restReveal,
-  dollarReveal,
+  edgeBloom,
   hoverLean,
   reducedMotion,
   onReady,
@@ -133,35 +128,25 @@ function LogoQuad({
   const maxTilt = (tiltClamp * Math.PI) / 180;
   const ready = useRef(false);
 
-  const [base, normal, dollarA, dollarB, env] = useTexture([
-    "/assets/tex-base.png",
-    "/assets/tex-normal.png",
-    "/assets/tex-dollar-a.png",
-    "/assets/tex-dollar-b.png",
-    "/assets/dollar.png",
-  ]);
-  base.colorSpace = THREE.SRGBColorSpace;
-  dollarA.colorSpace = THREE.SRGBColorSpace;
-  dollarB.colorSpace = THREE.SRGBColorSpace;
+  // Two textures where there were five. The cyan base, its normal map and the second angle
+  // frame all existed to reconstruct the note onto a different asterisk; the render carries its
+  // own bevels and its own outline, so none of them have anything left to do.
+  const [art, env] = useTexture(["/assets/tex-dollar-a.png", "/assets/dollar.png"]);
+  art.colorSpace = THREE.SRGBColorSpace;
   env.colorSpace = THREE.SRGBColorSpace;
-  normal.colorSpace = THREE.NoColorSpace;
   env.wrapS = env.wrapT = THREE.RepeatWrapping;
 
   const uniforms = useMemo(
     () => ({
-      uBase: { value: base },
-      uNormal: { value: normal },
-      uDollarA: { value: dollarA },
-      uDollarB: { value: dollarB },
+      uArt: { value: art },
       uEnv: { value: env },
       uTime: { value: 0 },
-      uReveal: { value: 0 },
-      uDollarMix: { value: dollarReveal },
+      uHover: { value: 0 },
       uReflStrength: { value: reflStrength },
       uVelocity: { value: 0 },
       uRotation: { value: new THREE.Vector2(0, 0) },
     }),
-    [base, normal, dollarA, dollarB, env], // eslint-disable-line react-hooks/exhaustive-deps
+    [art, env],
   );
   uniforms.uReflStrength.value = reflStrength;
 
@@ -173,7 +158,6 @@ function LogoQuad({
   const spin = useRef(0);
   const spinVel = useRef(0);
   const tilt = useRef(new THREE.Vector2(0, 0));
-  const reveal = useRef(0);
   const vel = useRef(0);
   const dragging = useRef(false);
   const idleDir = useRef(1); // sign of the resting idle spin — follows the last flick
@@ -188,7 +172,7 @@ function LogoQuad({
   // rather than "is it near the canvas". Sampled once into a small array — reading pixels per
   // pointer move would be far too slow, and 128 is finer than the arms are thin.
   const alphaMap = useMemo(() => {
-    const img = base.image as CanvasImageSource & { width?: number };
+    const img = art.image as CanvasImageSource & { width?: number };
     if (!img || !img.width) return null;
     const c = document.createElement("canvas");
     c.width = ALPHA_LOOKUP;
@@ -200,7 +184,7 @@ function LogoQuad({
     const out = new Uint8Array(ALPHA_LOOKUP * ALPHA_LOOKUP);
     for (let i = 0; i < out.length; i++) out[i] = px[i * 4 + 3];
     return out;
-  }, [base]);
+  }, [art]);
 
   // uv is fixed to the plate, so this stays correct however far the logo has spun or tilted.
   // Flipped on v: GL samples bottom-up, the 2D canvas above wrote top-down.
@@ -360,19 +344,10 @@ function LogoQuad({
     if (!reducedMotion) scrollEnergy.current *= Math.pow(SCROLL_DECAY, f);
     const scrollDrive = reducedMotion ? 0 : scrollEnergy.current * scrollReveal;
 
-    // restReveal is the floor: the idle turn is only ~0.1 rad/s, so speed alone leaves the
-    // reveal near zero and the facets have nothing to catch. Holding it at rest keeps the
-    // reflection live through the whole rotation; drag and scroll bloom above it.
     const speed = Math.abs(spinVel.current);
-    const targetReveal = Math.min(1, Math.max(restReveal, speed * 0.4, scrollDrive));
     const targetVel = Math.min(1, Math.max(speed * 0.5, scrollDrive));
-    if (reducedMotion) {
-      vel.current = targetVel;
-      reveal.current = targetReveal;
-    } else {
-      vel.current += (targetVel - vel.current) * 0.15;
-      reveal.current += (targetReveal - reveal.current) * Math.min(1, dt * 5);
-    }
+    if (reducedMotion) vel.current = targetVel;
+    else vel.current += (targetVel - vel.current) * 0.15;
 
     // Resting wobble on both tilt axes, so the plate keeps reading as a solid object even
     // when nobody is touching it — a pure Z spin is what made it look like a flat disc.
@@ -400,14 +375,14 @@ function LogoQuad({
       meshRef.current.rotation.set(tiltX, tiltY, BASE_ROTATION + spin.current);
     }
     uniforms.uRotation.value.set(spin.current + tilt.current.x, tilt.current.y);
-    uniforms.uReveal.value = reveal.current;
+
     // How far the user has actually turned the plate off-axis, 0..1. Read off the drag tilt
-    // alone, not the composed tiltX/tiltY: those carry the idle wobble, which never stops,
-    // so the note would sit permanently half-revealed instead of answering the turn.
+    // alone, not the composed tiltX/tiltY: those carry the idle wobble, which never stops.
     const turn = Math.min(1, Math.hypot(tilt.current.x, tilt.current.y) / maxTilt);
-    // Proximity or turn gates the portrait, whichever is stronger: plain cyan glass at rest,
-    // the note surfacing as the cursor nears or as the plate is turned to its side.
-    uniforms.uDollarMix.value = dollarReveal * Math.max(hover.current, turn);
+    // Hover and turn now bloom the *edges* rather than gating the note — the note is simply
+    // always there. So approaching the plate makes its glass catch more light, which answers
+    // the cursor without moving or foreshortening the mark.
+    uniforms.uHover.value = edgeBloom * Math.max(hover.current, turn);
     uniforms.uVelocity.value = vel.current;
     uniforms.uTime.value = reducedMotion ? 0 : state.clock.elapsedTime;
 
@@ -482,10 +457,18 @@ export default function GlossyLogo(props: GlossyLogoProps) {
       {!painted && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src="/assets/asterisk.png"
+          src="/assets/tex-dollar-a.png"
           alt=""
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 m-auto h-auto w-[75%] max-w-none select-none"
+          // Same texture the canvas draws, so the handoff is invisible — it used to be the cyan
+          // asterisk, which is a different render and a different silhouette, so the swap
+          // flashed one plate into another.
+          //
+          // 48.57% is the quad's own share of the frame: it is 1.7 world units against a VIEW
+          // of 3.5. Capping both axes rather than setting a width makes that a share of the
+          // *smaller* edge, which is what VIEW spans — the desktop slot is landscape and the
+          // mobile one portrait, so a width alone would only be right on one of them.
+          className="pointer-events-none absolute inset-0 m-auto max-h-[48.57%] max-w-[48.57%] select-none"
           style={FALLBACK_STYLE}
         />
       )}
@@ -508,8 +491,7 @@ export default function GlossyLogo(props: GlossyLogoProps) {
             idleSpeed={settings.idleSpeed}
             scrollReveal={settings.scrollReveal}
             idleTilt={settings.idleTilt}
-            restReveal={settings.restReveal}
-            dollarReveal={settings.dollarReveal}
+            edgeBloom={settings.edgeBloom}
             hoverLean={settings.hoverLean}
             reducedMotion={reduced}
             onReady={() => setPainted(true)}
