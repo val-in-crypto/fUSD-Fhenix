@@ -27,7 +27,6 @@ const FOV = 30;
 
 // physics feel — defaults; overridable via props for art direction
 const DEFAULTS = {
-  reflStrength: 0.35,
   inertiaDecay: 0.94, // per 1/60 s
   tiltClamp: 30, // degrees
   idleSpeed: 0.5,
@@ -69,12 +68,23 @@ const ALPHA_HIT = 40;
 // a full turn in ~63s (luxury-watch pace).
 const IDLE_VEL = 0.2;
 
-// No extra opacity here: tex-base.png already carries the cyan render's own alpha 0.7, and
-// stacking the two took it to 0.49 and a visibly fainter plate than the canvas draws.
-const FALLBACK_STYLE: React.CSSProperties = { transform: "rotate(-25.98deg)" };
+/** The spec verbatim: flat cyan, masked to the render's shape, at the spec's angle. aspectRatio
+ *  keeps it square, since the mask is a square texture and the div has no intrinsic size. */
+const FALLBACK_STYLE: React.CSSProperties = {
+  transform: "rotate(-22.35deg)",
+  aspectRatio: "1 / 1",
+  background: "#00F0FF",
+  WebkitMaskImage: "url(/assets/tex-dollar-a.png)",
+  WebkitMaskRepeat: "no-repeat",
+  WebkitMaskPosition: "center",
+  WebkitMaskSize: "contain",
+  maskImage: "url(/assets/tex-dollar-a.png)",
+  maskRepeat: "no-repeat",
+  maskPosition: "center",
+  maskSize: "contain",
+};
 
 export type GlossyLogoProps = {
-  reflStrength?: number;
   inertiaDecay?: number;
   tiltClamp?: number; // degrees
   idleSpeed?: number;
@@ -112,7 +122,6 @@ function FitCamera() {
 }
 
 function LogoQuad({
-  reflStrength,
   inertiaDecay,
   tiltClamp,
   idleSpeed,
@@ -128,34 +137,23 @@ function LogoQuad({
   const maxTilt = (tiltClamp * Math.PI) / 180;
   const ready = useRef(false);
 
-  // Three textures where there were five. The normal map and the second angle frame are gone
-  // for good — one existed to light a shape that is no longer the plate, the other put a second
-  // outline on screen. The cyan base earns its place back as the rest state, but only ever as a
-  // colour: the outline is the note's, always.
-  const [base, art, env] = useTexture([
-    "/assets/tex-glass.png",
-    "/assets/tex-dollar-a.png",
-    "/assets/dollar.png",
-  ]);
+  // One texture, where there were five. The rest state is this render's own alpha filled with
+  // flat cyan, so there is no second asterisk to keep in register — which is what every earlier
+  // version was fighting. The cyan plate, its normal map, the second angle frame and the matcap
+  // environment all existed to serve that reconciliation and have nothing left to do.
+  const [art] = useTexture(["/assets/tex-dollar-a.png"]);
   art.colorSpace = THREE.SRGBColorSpace;
-  base.colorSpace = THREE.SRGBColorSpace;
-  env.colorSpace = THREE.SRGBColorSpace;
-  env.wrapS = env.wrapT = THREE.RepeatWrapping;
 
   const uniforms = useMemo(
     () => ({
-      uBase: { value: base },
       uArt: { value: art },
-      uEnv: { value: env },
       uTime: { value: 0 },
       uReveal: { value: 0 },
-      uReflStrength: { value: reflStrength },
       uVelocity: { value: 0 },
       uRotation: { value: new THREE.Vector2(0, 0) },
     }),
-    [base, art, env],
+    [art],
   );
-  uniforms.uReflStrength.value = reflStrength;
 
   const material = useMemo(
     () => new THREE.ShaderMaterial({ vertexShader, fragmentShader, uniforms, transparent: true }),
@@ -179,7 +177,7 @@ function LogoQuad({
   // rather than "is it near the canvas". Sampled once into a small array — reading pixels per
   // pointer move would be far too slow, and 128 is finer than the arms are thin.
   const alphaMap = useMemo(() => {
-    const img = base.image as CanvasImageSource & { width?: number };
+    const img = art.image as CanvasImageSource & { width?: number };
     if (!img || !img.width) return null;
     const c = document.createElement("canvas");
     c.width = ALPHA_LOOKUP;
@@ -191,7 +189,7 @@ function LogoQuad({
     const out = new Uint8Array(ALPHA_LOOKUP * ALPHA_LOOKUP);
     for (let i = 0; i < out.length; i++) out[i] = px[i * 4 + 3];
     return out;
-  }, [base]);
+  }, [art]);
 
   // uv is fixed to the plate, so this stays correct however far the logo has spun or tilted.
   // Flipped on v: GL samples bottom-up, the 2D canvas above wrote top-down.
@@ -479,18 +477,15 @@ export default function GlossyLogo(props: GlossyLogoProps) {
           Hidden once the canvas paints its first frame so it can't ghost behind rotation.
           The accessible name lives on the wrapper, so it survives this being removed. */}
       {!painted && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src="/assets/tex-glass.png"
-          alt=""
+        // The spec's own construction: the render's alpha as a mask over a flat fill. Same two
+        // things the shader does at rest, so the handoff to the canvas is invisible, and the
+        // no-WebGL path is the designer's markup rather than an approximation of it.
+        //
+        // 79.07% is the quad's share of the frame — 1.7 world units against a VIEW of 2.15.
+        // Capping both axes rather than setting a width makes that a share of the *smaller*
+        // edge, which is what VIEW spans, so it stays right whichever way the box is oriented.
+        <div
           aria-hidden="true"
-          // The cyan plate, which is what the canvas draws at rest — the note only appears under
-          // the pointer, and there is no pointer before the canvas has painted.
-          //
-          // 79.07% is the quad's own share of the frame: 1.7 world units against a VIEW of 2.15.
-          // Capping both axes rather than setting a width makes that a share of the *smaller*
-          // edge, which is what VIEW spans — the desktop box is portrait and the mobile slot
-          // portrait too, but a width alone would still be wrong whenever that flips.
           className="pointer-events-none absolute inset-0 m-auto max-h-[79.07%] max-w-[79.07%] select-none"
           style={FALLBACK_STYLE}
         />
@@ -508,7 +503,6 @@ export default function GlossyLogo(props: GlossyLogoProps) {
           <PerspectiveCamera makeDefault fov={FOV} position={[0, 0, 5]} />
           <FitCamera />
           <LogoQuad
-            reflStrength={settings.reflStrength}
             inertiaDecay={settings.inertiaDecay}
             tiltClamp={settings.tiltClamp}
             idleSpeed={settings.idleSpeed}
