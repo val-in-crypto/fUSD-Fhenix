@@ -71,6 +71,21 @@ export const fragmentShader = /* glsl */ `
   const float FACET_HI = 0.35;
   const float FACET_MIX = 0.22;
 
+  // How far the interior art is displaced by the surface it is seen through, and by the turn.
+  // Both are in uv units on a plate that spans 1.0, so 0.045 is about a twentieth of the
+  // block's width — a plausible read for something a third as thick as it is wide.
+  const float ART_DEPTH = 0.045;
+  const float ART_PARALLAX = 0.06;
+
+  // Body shading. Ambient sits high on purpose: this is glass in a bright room, not a solid
+  // under a spotlight, so the diffuse term supplies form without the plate going dark on the
+  // side turned away.
+  const float BODY_AMBIENT = 0.72;
+  const float BODY_DIFFUSE = 0.55;
+  // Strength of the lit-end-to-dark-end falloff across the plate. uv - 0.5 reaches 0.5, so
+  // this is half the peak swing: 0.5 here puts the two ends about 25% apart.
+  const float DEPTH_GRADIENT = 0.55;
+
   // How hard the bevels work, at rest and at full spin. uVelocity is clamped to 0..1 on the
   // JS side, so these are the two ends of the range rather than a scale factor.
   const float EDGE_REST = 0.35;
@@ -128,7 +143,13 @@ export const fragmentShader = /* glsl */ `
 
     // Pick between the two angle frames on tilt sign, premultiplied — they carry their own
     // alpha and a straight mix would drag each one's transparent black into the other's edge.
-    vec2 aUv = artUv(uv);
+    // The art is inside the block, not printed on it, and this is what selling that costs.
+    // Sampling it through the surface normal displaces it wherever the glass is steep, so the
+    // interior slides against the outline along every bevel — which is what looking through a
+    // thick edge does. The tilt term shifts the whole interior as the plate turns: motion
+    // parallax, the one depth cue a flat quad can produce honestly.
+    vec2 refr = rawN.xy * ART_DEPTH + vec2(uRotation.y, 0.0) * ART_PARALLAX;
+    vec2 aUv = artUv(uv) + refr;
     vec4 dA = texture2D(uDollarA, aUv);
     vec4 dB = texture2D(uDollarB, aUv);
     float frameMix = clamp(uRotation.y / FRAME_TILT_RANGE * 0.5 + 0.5, 0.0, 1.0);
@@ -160,6 +181,24 @@ export const fragmentShader = /* glsl */ `
     // it for the art's made the arms visibly change shape as the reveal came up.
     vec3 col = mix(base.rgb, artCol, reveal * artCover);
     float outA = base.a;
+
+    // ── Form ─────────────────────────────────────────────────────────────────────
+    // Directional shading across the body. Everything else here models the plate at its rim,
+    // which leaves every face between the edges sitting at one flat value — a bright outline
+    // around a sticker. This is what puts a light and a dark side on the thing.
+    // This has to come off rawN, not the leaned n above. n carries dir * SPIN_LEAN, so dotting
+    // it against a light that also travels on dir is dominated by dir . dir — a constant, and
+    // a constant multiply is not modelling. rawN is the surface the normal map actually
+    // describes, so bevels turned toward the light take it and the ones turned away do not.
+    vec3 L = normalize(vec3(dir * 0.8, 0.6));
+    float lambert = clamp(dot(rawN, L), 0.0, 1.0);
+    col *= BODY_AMBIENT + BODY_DIFFUSE * lambert;
+
+    // A gradient across the whole plate, lit end to dark end. A face at one even value is most
+    // of what reads as a sticker; a solid picks up a falloff because one end of it is further
+    // from the light than the other. Laid along dir, which counter-rotates, so the gradient
+    // holds still on screen and the arms travel through it instead of carrying it around.
+    col *= 1.0 + DEPTH_GRADIENT * dot(uv - 0.5, dir);
 
     // matcap env sheen from the perturbed normal — subtle at rest, blooms with velocity
     vec2 mUv = n.xy * 0.5 + 0.5 + vec2(sin(ang), cos(ang)) * 0.1;
