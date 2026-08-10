@@ -8,20 +8,19 @@ import * as THREE from "three";
 import { useReducedMotion } from "@/components/motion/MotionProvider";
 import { fragmentShader, vertexShader } from "./shaders/glossyLogo";
 
-const BASE_ROTATION = (-25.98 * Math.PI) / 180;
+// The spec's angle for this element, given for both the with-bill and without-bill states.
+// CLAUDE.md's -25.98 is the logo mark's, a different node.
+const BASE_ROTATION = (-22.35 * Math.PI) / 180;
 // World units across the smaller viewport edge, so larger = smaller logo.
 //
-// Set from the designer's render rather than by eye. In hero-glass.png the asterisk fills 72%
-// of its frame's height, and that frame is placed 599.4px tall in a 1024px stage — so the
-// mark is meant to stand about 431px, or 42% of the stage. Every value this has held was well
-// over that: 2.5 gave 64%, 2.1 gave 74%, 2.3 gave 64% again at the sizes actually measured.
+// The canvas now occupies the spec's own box rather than a large slot with the mark floating
+// inside it, so this is set against that box: the asterisk covers 0.91 of the texture on a 1.7
+// quad, giving 1.547 / VIEW of the box's smaller edge. 2.15 puts it at 72% of the box height,
+// which is the fraction the designer's render fills its frame.
 //
-// The arithmetic runs: the asterisk covers 0.91 of tex-base.png, on a 1.7 quad, so its height
-// is 1.547 / VIEW of the canvas's smaller edge. 3.5 lands it on the design's 42%.
-//
-// Scaled rather than stretched — the plate is square and the art is square within it, so
-// pulling only its height would distort the mark itself.
-const VIEW = 3.5;
+// On-screen size is unchanged from the 3.5-against-the-old-slot it replaces — 303px against
+// 305px at 1280 x 720. Only the frame it is measured against moved.
+const VIEW = 2.15;
 // Vertical FOV. Narrow on purpose: enough foreshortening for the tilt to read as depth,
 // short of the wide-angle stretch that would fight the flat, product-shot framing.
 const FOV = 30;
@@ -488,11 +487,11 @@ export default function GlossyLogo(props: GlossyLogoProps) {
           // The cyan plate, which is what the canvas draws at rest — the note only appears under
           // the pointer, and there is no pointer before the canvas has painted.
           //
-          // 48.57% is the quad's own share of the frame: it is 1.7 world units against a VIEW
-          // of 3.5. Capping both axes rather than setting a width makes that a share of the
-          // *smaller* edge, which is what VIEW spans — the desktop slot is landscape and the
-          // mobile one portrait, so a width alone would only be right on one of them.
-          className="pointer-events-none absolute inset-0 m-auto max-h-[48.57%] max-w-[48.57%] select-none"
+          // 79.07% is the quad's own share of the frame: 1.7 world units against a VIEW of 2.15.
+          // Capping both axes rather than setting a width makes that a share of the *smaller*
+          // edge, which is what VIEW spans — the desktop box is portrait and the mobile slot
+          // portrait too, but a width alone would still be wrong whenever that flips.
+          className="pointer-events-none absolute inset-0 m-auto max-h-[79.07%] max-w-[79.07%] select-none"
           style={FALLBACK_STYLE}
         />
       )}

@@ -121,12 +121,16 @@ export default function Hero() {
           style={{ right: 40, top: "calc(50% - 3px)" }}
         />
 
-        {/* Interactive glossy logo */}
+        {/* Interactive glossy logo, in the spec's own box: 564.15 x 599.4 at (342.5, 147.42) of
+            the 1440 x 1024 frame, given identically for the with-bill and without-bill states.
+            As fractions so it tracks the stage rather than freezing.
+
+            This replaces a much larger slot with the mark floating inside it, which is why VIEW
+            moves with it — the on-screen size is the same, only the frame it is measured
+            against changed. The -22.35deg is the spec's too, and lives on the mesh. */}
         <div
           className="absolute"
-          // Width as a fraction of the stage (1082/1440), not frozen px: below the 1440
-          // design width a fixed 1082 runs past the right edge — 119px of it at 1100.
-          style={{ left: "calc(8.33% + 45px)", top: "7.324%", width: "75.139%", height: "95.703%" }}
+          style={{ left: "23.785%", top: "14.396%", width: "39.177%", height: "58.535%" }}
         >
           <GlossyLogo />
         </div>
