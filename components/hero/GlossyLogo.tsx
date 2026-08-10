@@ -2,7 +2,6 @@
 
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { PerspectiveCamera, useTexture } from "@react-three/drei";
-import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { useReducedMotion } from "@/components/motion/MotionProvider";
@@ -534,11 +533,6 @@ export default function GlossyLogo(props: GlossyLogoProps) {
             reducedMotion={reduced}
             onReady={() => setPainted(true)}
           />
-          {!reduced && (
-            <EffectComposer>
-              <Bloom intensity={0.4} luminanceThreshold={0.72} luminanceSmoothing={0.15} mipmapBlur />
-            </EffectComposer>
-          )}
         </Canvas>
       )}
     </div>
