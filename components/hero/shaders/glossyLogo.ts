@@ -1,8 +1,8 @@
 // GLSL for the glossy fUSD logo.
 //
-// One texture, one silhouette. The plate rests as the designer's frosted-glass treatment in the
-// exact shape of the dollar-glass render — that render's own alpha used as the mask, per the
-// spec — and fades the note in under the pointer. Both states come from the same PNG, so the
+// One texture, one silhouette. The plate rests as the designer's three-layer glass — a thick
+// cyan edge, a frosted body, and a sharp reflection — all masked by the dollar-glass render's own
+// alpha, and fades the note in under the pointer. Both states come from the same PNG, so the
 // silhouette is identical by definition: nothing to fit, nothing to warp, nothing that can drift
 // out of register.
 //
@@ -13,14 +13,16 @@
 // either way showed as arm tips the note never reached. Masking removes the second shape rather
 // than trying to reconcile it.
 //
-// The rest state is the spec's CSS, layer for layer, composited here instead of by the browser —
-// because the plate spins and tilts, and a DOM element cannot follow a mesh. What the browser
-// would do to a stack of translucent gradients over a white page, this does in one pass.
+// The rest state is the spec's CSS, composited here instead of by the browser — because the plate
+// spins and tilts, and a DOM element cannot follow a mesh. The three layers carry different
+// scales, which is the whole trick: the edge sits 3.5% proud of the body, so it shows as a rim
+// all the way round rather than needing a stroke.
 //
-// Two things in that CSS do not survive the move, both harmlessly. backdrop-filter blurs and
-// saturates what is behind the element, and behind this is a plain white hero, so it resolves to
-// white either way. The drop-shadows fall outside the mask, which this shader discards; they
-// would need a second pass to reproduce and are a glow around the mark rather than glass in it.
+// backdrop-filter does not survive the move, harmlessly: it blurs what is behind the element, and
+// behind this is a plain white hero, so it resolves to white either way — which is what the
+// layers are composited over. The drop-shadows do not either; they fall outside the mask, which
+// this shader discards, and are a glow around the mark rather than glass in it. The CSS fallback
+// keeps both.
 
 export const vertexShader = /* glsl */ `
   varying vec2 vUv;
@@ -40,6 +42,12 @@ export const fragmentShader = /* glsl */ `
   uniform vec2  uRotation;  // x: spin phase, y: tilt
 
   varying vec2 vUv;
+
+  // One CSS pixel, in uv. The mask is contain-fitted, so the square texture spans the box's
+  // smaller edge — 564.15px — and that is the scale the spec's shadow offsets are written in.
+  const float PX = 1.0 / 564.15;
+
+  const vec4 CLEAR = vec4(0.0);
 
   // Progress along a CSS linear-gradient axis, for a 1x1 box.
   //
@@ -66,69 +74,104 @@ export const fragmentShader = /* glsl */ `
   }
 
   vec3 over(vec3 dst, vec4 src) { return mix(dst, src.rgb, src.a); }
+  vec4 overA(vec4 dst, vec4 src) {
+    float a = src.a + dst.a * (1.0 - src.a);
+    vec3 c = a > 0.0001
+      ? (src.rgb * src.a + dst.rgb * dst.a * (1.0 - src.a)) / a
+      : vec3(0.0);
+    return vec4(c, a);
+  }
 
-  const vec4 CLEAR = vec4(0.0);
+  // Each layer carries its own scale, so it samples the mask — and lays out its gradients — in
+  // its own space. transform: scale() scales the painted result, gradient and all.
+  vec2 scaled(vec2 uv, float s) { return (uv - 0.5) / s + 0.5; }
+  float maskAt(vec2 q) {
+    if (q.x < 0.0 || q.x > 1.0 || q.y < 0.0 || q.y > 1.0) return 0.0;
+    return texture2D(uArt, q).a;
+  }
+
+  // A CSS inset shadow is the shape's own inverse, offset and blurred, clipped back inside it.
+  // Five taps is enough for the soft falloff these use. CSS y runs down and uv runs up, so the
+  // offset's y is negated on the way in.
+  float insetShadow(vec2 q, vec2 offsetPx, float blurPx) {
+    vec2 o = vec2(offsetPx.x, -offsetPx.y) * PX;
+    float b = blurPx * PX * 0.5;
+    float acc = 1.0 - maskAt(q - o);
+    acc += 1.0 - maskAt(q - o + vec2(b, 0.0));
+    acc += 1.0 - maskAt(q - o - vec2(b, 0.0));
+    acc += 1.0 - maskAt(q - o + vec2(0.0, b));
+    acc += 1.0 - maskAt(q - o - vec2(0.0, b));
+    return clamp(acc / 5.0, 0.0, 1.0);
+  }
 
   void main() {
     vec2 uv = vUv;
 
-    vec4 art = texture2D(uArt, uv);
-    if (art.a < 0.005) discard;
+    // ── the thick cyan edge, 3.5% proud ─────────────────────────────────────────
+    vec2 qe = scaled(uv, 1.035);
+    float ae = maskAt(qe);
+    if (ae < 0.005 && maskAt(scaled(uv, 0.965)) < 0.005) discard;
 
-    // Into CSS space: y down, so every angle and percentage below reads as written.
-    vec2 p = vec2(uv.x, 1.0 - uv.y);
+    vec2 pe = vec2(qe.x, 1.0 - qe.y);
+    float te = gradT(pe, 135.0);
+    vec3 edge;
+    if (te < 0.12)      edge = mix(vec3(0.918, 1.000, 1.000), vec3(0.463, 0.965, 1.000), te / 0.12);
+    else if (te < 0.35) edge = mix(vec3(0.463, 0.965, 1.000), vec3(0.000, 0.875, 0.949), (te - 0.12) / 0.23);
+    else if (te < 0.60) edge = mix(vec3(0.000, 0.875, 0.949), vec3(0.000, 0.561, 0.682), (te - 0.35) / 0.25);
+    else if (te < 0.82) edge = mix(vec3(0.000, 0.561, 0.682), vec3(0.396, 0.961, 1.000), (te - 0.60) / 0.22);
+    else                edge = mix(vec3(0.396, 0.961, 1.000), vec3(1.000, 1.000, 1.000), (te - 0.82) / 0.18);
 
-    // ── background layer 2: linear-gradient(145deg, ...) ─────────────────────────
-    float t1 = gradT(p, 145.0);
+    // ── the frosted body, 3.5% inside ───────────────────────────────────────────
+    vec2 qb = scaled(uv, 0.965);
+    float ab = maskAt(qb);
+    vec2 pb = vec2(qb.x, 1.0 - qb.y);
+
+    float tb = gradT(pb, 145.0);
     vec4 body;
-    if (t1 < 0.22) {
-      body = stopMix(vec4(0.902, 1.000, 1.000, 0.90), vec4(0.490, 0.933, 0.980, 0.75), t1 / 0.22);
-    } else if (t1 < 0.52) {
-      body = stopMix(vec4(0.490, 0.933, 0.980, 0.75), vec4(0.282, 0.808, 0.882, 0.55), (t1 - 0.22) / 0.30);
-    } else {
-      body = stopMix(vec4(0.282, 0.808, 0.882, 0.55), vec4(0.725, 0.973, 1.000, 0.80), (t1 - 0.52) / 0.48);
-    }
+    if (tb < 0.20)      body = stopMix(vec4(0.882, 1.000, 1.000, 0.95), vec4(0.627, 0.961, 1.000, 0.90), tb / 0.20);
+    else if (tb < 0.55) body = stopMix(vec4(0.627, 0.961, 1.000, 0.90), vec4(0.314, 0.804, 0.882, 0.72), (tb - 0.20) / 0.35);
+    else                body = stopMix(vec4(0.314, 0.804, 0.882, 0.72), vec4(0.745, 0.980, 1.000, 0.90), (tb - 0.55) / 0.45);
 
-    // ── background layer 1: radial-gradient(circle at 30% 20%, ...) ──────────────
-    // No size given, so CSS sizes it farthest-corner — from (0.3, 0.2) that is (1, 1).
-    float r1 = distance(p, vec2(0.30, 0.20)) / distance(vec2(1.0, 1.0), vec2(0.30, 0.20));
+    // radial-gradient(circle at 28% 18%, ...) — no size given, so CSS sizes it farthest-corner
+    float rb = distance(pb, vec2(0.28, 0.18)) / distance(vec2(1.0, 1.0), vec2(0.28, 0.18));
     vec4 sheen = CLEAR;
-    if (r1 < 0.20) {
-      sheen = stopMix(vec4(1.0, 1.0, 1.0, 0.78), vec4(1.0, 1.0, 1.0, 0.30), r1 / 0.20);
-    } else if (r1 < 0.42) {
-      sheen = stopMix(vec4(1.0, 1.0, 1.0, 0.30), CLEAR, (r1 - 0.20) / 0.22);
-    }
+    if (rb < 0.14)      sheen = stopMix(vec4(1.0, 1.0, 1.0, 0.95), vec4(1.0, 1.0, 1.0, 0.50), rb / 0.14);
+    else if (rb < 0.34) sheen = stopMix(vec4(1.0, 1.0, 1.0, 0.50), CLEAR, (rb - 0.14) / 0.20);
+    body = overA(body, sheen);
 
-    // ── ::before — the glossy reflection, at 0.8 layer opacity ───────────────────
-    float t2 = gradT(p, 125.0);
-    vec4 gloss = CLEAR;
-    if (t2 < 0.12) {
-      gloss = stopMix(vec4(1.0, 1.0, 1.0, 0.90), vec4(1.0, 1.0, 1.0, 0.35), t2 / 0.12);
-    } else if (t2 < 0.31) {
-      gloss = stopMix(vec4(1.0, 1.0, 1.0, 0.35), CLEAR, (t2 - 0.12) / 0.19);
-    } else if (t2 >= 0.70) {
-      gloss = stopMix(CLEAR, vec4(0.0, 0.922, 1.0, 0.28), (t2 - 0.70) / 0.30);
-    }
-    gloss.a *= 0.8;
+    // the two inset shadows: white from the top-left, teal from the bottom-right
+    body = overA(body, vec4(1.0, 1.0, 1.0, 0.55 * insetShadow(qb, vec2(10.0, 10.0), 20.0)));
+    body = overA(body, vec4(0.0, 0.471, 0.588, 0.30 * insetShadow(qb, vec2(-14.0, -16.0), 26.0)));
 
-    // ── ::after — cyan depth. Its linear sits under its radial, as listed. ───────
-    float t3 = gradT(p, 160.0);
-    vec4 depth = t3 < 0.40 ? CLEAR : stopMix(CLEAR, vec4(0.0, 0.922, 1.0, 0.25), (t3 - 0.40) / 0.60);
-    float r2 = distance(p, vec2(0.60, 0.65)) / 0.55;
-    vec4 pool = r2 < 1.0 ? stopMix(vec4(0.0, 0.725, 0.843, 0.25), CLEAR, r2) : CLEAR;
+    // ── the sharp reflection, at 0.72 layer opacity ─────────────────────────────
+    vec2 qs = scaled(uv, 0.97);
+    float as = maskAt(qs);
+    vec2 ps = vec2(qs.x, 1.0 - qs.y);
 
-    // Composited over the white hero, bottom to top, which is what backdrop-filter would have
-    // resolved to anyway.
+    float ts = gradT(ps, 125.0);
+    vec4 shine;
+    if (ts < 0.04)      shine = stopMix(vec4(1.0, 1.0, 1.0, 0.95), vec4(1.0, 1.0, 1.0, 0.65), ts / 0.04);
+    else if (ts < 0.16) shine = stopMix(vec4(1.0, 1.0, 1.0, 0.65), vec4(1.0, 1.0, 1.0, 0.12), (ts - 0.04) / 0.12);
+    else if (ts < 0.29) shine = stopMix(vec4(1.0, 1.0, 1.0, 0.12), CLEAR, (ts - 0.16) / 0.13);
+    else if (ts < 0.68) shine = CLEAR;
+    else if (ts < 0.84) shine = stopMix(CLEAR, vec4(0.0, 0.933, 1.0, 0.28), (ts - 0.68) / 0.16);
+    else                shine = stopMix(vec4(0.0, 0.933, 1.0, 0.28), vec4(1.0, 1.0, 1.0, 0.72), (ts - 0.84) / 0.16);
+    shine.a *= 0.72;
+
+    // ── composite, over the white hero ──────────────────────────────────────────
     vec3 glass = vec3(1.0);
-    glass = over(glass, body);
-    glass = over(glass, sheen);
-    glass = over(glass, gloss);
-    glass = over(glass, depth);
-    glass = over(glass, pool);
+    glass = over(glass, vec4(edge, ae));
+    glass = over(glass, vec4(body.rgb, body.a * ab));
+    glass = over(glass, vec4(shine.rgb, shine.a * as));
 
-    // The note answers the pointer and nothing else.
-    vec3 col = mix(glass, art.rgb, uReveal);
+    // The union is the edge, since it is the largest of the three.
+    float outA = max(ae, max(ab, as));
 
-    gl_FragColor = vec4(col, art.a);
+    // The note answers the pointer and nothing else. It is drawn at the mask's own scale, so it
+    // sits inside the edge exactly as the body does.
+    vec4 art = texture2D(uArt, uv);
+    vec3 col = mix(glass, art.rgb, uReveal * art.a);
+
+    gl_FragColor = vec4(col, mix(outA, max(outA, art.a), uReveal));
   }
 `;

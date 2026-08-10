@@ -69,38 +69,17 @@ const ALPHA_HIT = 40;
 const IDLE_VEL = 0.2;
 
 /**
- * The spec verbatim: the frosted-glass stack, masked to the render's shape, at the spec's angle.
+ * The spec's three glass layers. The shader composites these same three for the canvas, so both
+ * paths draw the same thing and the handoff is invisible.
  *
- * The shader composites these same layers for the canvas, so the two draw the same thing and the
- * handoff is invisible. Kept as real CSS here rather than a screenshot of it, which is what makes
- * the no-WebGL path the designer's own markup instead of an approximation.
- *
- * aspectRatio keeps it square: the mask is a square texture and a div has no intrinsic size.
+ * Only the box lives here — the layers are three children carrying the shared mask, since a
+ * single element cannot hold three differently-scaled copies of itself. aspectRatio keeps the box
+ * square: the mask is a square texture and a div has no intrinsic size.
  */
-const MASK = 'url(/assets/tex-dollar-a.png) center / contain no-repeat';
-
 const FALLBACK_STYLE: React.CSSProperties = {
   transform: "rotate(-22.35deg)",
   aspectRatio: "1 / 1",
-  background: [
-    "radial-gradient(circle at 30% 20%," +
-      " rgba(255,255,255,0.78) 0%, rgba(255,255,255,0.30) 20%, transparent 42%)",
-    "linear-gradient(145deg," +
-      " rgba(230,255,255,0.9) 0%, rgba(125,238,250,0.75) 22%," +
-      " rgba(72,206,225,0.55) 52%, rgba(185,248,255,0.8) 100%)",
-  ].join(", "),
-  WebkitMask: MASK,
-  mask: MASK,
-  backdropFilter: "blur(10px) saturate(160%)",
-  WebkitBackdropFilter: "blur(10px) saturate(160%)",
-  filter: [
-    "drop-shadow(0 3px 1px rgba(255,255,255,0.7))",
-    "drop-shadow(0 9px 5px rgba(0,210,235,0.38))",
-    "drop-shadow(0 22px 30px rgba(0,0,0,0.3))",
-  ].join(" "),
-  overflow: "hidden",
-};
-export type GlossyLogoProps = {
+};export type GlossyLogoProps = {
   inertiaDecay?: number;
   tiltClamp?: number; // degrees
   idleSpeed?: number;
@@ -504,7 +483,11 @@ export default function GlossyLogo(props: GlossyLogoProps) {
           aria-hidden="true"
           className="glass-fallback pointer-events-none absolute inset-0 m-auto max-h-[79.07%] max-w-[79.07%] select-none"
           style={FALLBACK_STYLE}
-        />
+        >
+          <span className="asterisk-edge" />
+          <span className="asterisk-body" />
+          <span className="asterisk-shine" />
+        </div>
       )}
 
       {mounted && webgl && hasSize && (
