@@ -1,11 +1,10 @@
 import Socials from "@/components/ui/Socials";
 import WaitlistPill from "@/components/ui/WaitlistPill";
-import GlossyLogo from "./GlossyLogo";
 import { ArrowDown, ArrowEnter } from "./icons";
 
 /**
  * fUSD hero — faithful rebuild of Figma "Landing page" (94:3), top 1024px.
- * The logo is the interactive <GlossyLogo> canvas (drag to spin, dollar reveals).
+ * The logo is the designer's dollar-glass render, placed to the Figma spec (static).
  *
  * Desktop (>= md): exact fluid anchors as exported by Figma (calc(% + px)).
  * Mobile (< md): stacked reflow — decorative marks hidden, logo centered.
@@ -121,15 +120,29 @@ export default function Hero() {
           style={{ right: 40, top: "calc(50% - 3px)" }}
         />
 
-        {/* Interactive glossy logo */}
-        <div
-          className="absolute"
-          // Width as a fraction of the stage (1082/1440), not frozen px: below the 1440
-          // design width a fixed 1082 runs past the right edge — 119px of it at 1100.
-          style={{ left: "calc(8.33% + 45px)", top: "7.324%", width: "75.139%", height: "95.703%" }}
-        >
-          <GlossyLogo />
-        </div>
+        {/* The designer's dollar-glass render, placed to their spec rather than reconstructed:
+            564.15 x 599.4 at (342.5, 147.42), rotated -22.35deg. Offsets and size are fractions
+            of the 1440 x 1024 frame, so the whole thing tracks the stage instead of freezing.
+            Both box dimensions come from the spec rather than letting height follow the asset.
+            They disagree by 3.5% — the export is 0.975 aspect, the box 0.941 — and honouring
+            the box is the more faithful reading of "as given"; 3.5% is not visible.
+            Sourced from hero-glass.png, the "image 3" export downscaled to 1365px wide. The raw
+            file is 6.1MB, which is a lot to spend on one hero image when the box is 564px and
+            even a 2x display only asks for ~1128. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/assets/hero-glass.png"
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute max-w-none select-none"
+          style={{
+            left: "23.785%",
+            top: "14.396%",
+            width: "39.177%",
+            height: "58.535%",
+            transform: "rotate(-22.35deg)",
+          }}
+        />
 
         {/* ◐USD lockup */}
         <div className="absolute" style={{ left: 39, top: "2.539%" }}>
@@ -273,9 +286,18 @@ export default function Hero() {
         </div>
 
         {/* min-h-0 is load-bearing: a flex item's default min-height:auto would let the
-            canvas's intrinsic size win and push the CTA back off the screen. */}
+            image's intrinsic size win and push the CTA back off the screen. object-contain
+            so it fits whatever the flex row leaves, without cropping.
+            No rotation here — the desktop -22.35deg is part of a composition this stack does
+            not reproduce, and tilting it inside a narrow column just costs width. */}
         <div className="relative mx-auto mt-4 w-full max-w-[380px] flex-1 min-h-0">
-          <GlossyLogo />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/assets/hero-glass.png"
+            alt=""
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 h-full w-full object-contain select-none"
+          />
         </div>
 
         {/* Same status line. It cannot share the CTA's row here — pill, line and socials
