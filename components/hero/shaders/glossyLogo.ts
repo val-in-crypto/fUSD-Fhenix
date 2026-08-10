@@ -71,6 +71,20 @@ export const fragmentShader = /* glsl */ `
   const float FACET_HI = 0.35;
   const float FACET_MIX = 0.22;
 
+  // How hard the bevels work, at rest and at full spin. uVelocity is clamped to 0..1 on the
+  // JS side, so these are the two ends of the range rather than a scale factor.
+  const float EDGE_REST = 0.35;
+  const float EDGE_SPIN = 1.30;
+  // Falloff for the rim term. See the note at its use for why this is not the body's 3.0.
+  const float RIM_POWER = 8.0;
+  // How far the channels are pulled apart on a lit bevel. Real dispersion through a wedge this
+  // shallow is a fraction of a degree; this is scaled to something a ~500px logo can show.
+  const float RIM_DISPERSION = 0.055;
+  // Strength of the white core inside the fringe.
+  const float RIM_CORE = 0.6;
+  // How much of the specular band's travel comes from the spin rather than from time.
+  const float SPEC_SPIN = 3.0;
+
   // Tilt at which the frame blend reaches fully one angle or the other. The two renders are
   // shot at different angles, so crossing between them on tilt is what makes the turn read as
   // the block actually rotating rather than a texture fading up.
@@ -152,9 +166,42 @@ export const fragmentShader = /* glsl */ `
     vec3 env = texture2D(uEnv, fract(mUv)).rgb;
     col += env * fres * uReflStrength * (0.3 + uVelocity);
 
-    // moving specular band for glassiness
-    float spec = smoothstep(0.985, 1.0, sin((uv.x + uv.y) * 6.0 - uTime * 1.2) * 0.5 + 0.5);
-    col += spec * fres * 0.5;
+    // ── The sides ────────────────────────────────────────────────────────────────
+    // Everything below is the bevels, and all of it rides uVelocity: quiet at rest, and
+    // opening up as the plate turns. A block of glass declares itself at its edges — the flat
+    // faces are just a tinted window — so this is where turning has to pay off.
+    float edgeGain = EDGE_REST + EDGE_SPIN * uVelocity;
+
+    // Tighter than the body fresnel above. At 3.0 the falloff covers most of the plate and
+    // reads as a wash; at 8.0 it sits only where the surface is steep, which is where an edge
+    // actually is.
+    float rim = pow(1.0 - clamp(dot(n, V), 0.0, 1.0), RIM_POWER);
+
+    // Dispersion. The three channels leave a steep face at slightly different angles, so a lit
+    // bevel fringes rather than staying white — the single most reliable cue that something is
+    // glass and not chrome. Split along the rim's own gradient, which is the direction the
+    // surface is actually turning away in, and widened by the same gain, so the fringe opens as
+    // it spins and closes as it settles.
+    vec2 grad = length(n.xy) > 0.001 ? normalize(n.xy) : dir;
+    vec2 split = grad * RIM_DISPERSION * rim * edgeGain;
+    vec3 fringe = vec3(
+      texture2D(uEnv, fract(mUv + split)).r,
+      texture2D(uEnv, fract(mUv)).g,
+      texture2D(uEnv, fract(mUv - split)).b
+    );
+    col += fringe * rim * uReflStrength * edgeGain;
+
+    // A white core inside that fringe. Squared so it lands well inside the rim: without it the
+    // edge picks up only the environment's colour and reads as a coloured outline rather than
+    // as light caught on a chamfer.
+    col += vec3(rim * rim) * edgeGain * RIM_CORE;
+
+    // Moving specular band. Now carried by the spin as well as by time — tied to uTime alone
+    // it held still on screen while the plate turned underneath it, which is precisely the
+    // moment a highlight on glass should be travelling.
+    float spec = smoothstep(0.985, 1.0,
+      sin((uv.x + uv.y) * 6.0 - uTime * 1.2 - ang * SPEC_SPIN) * 0.5 + 0.5);
+    col += spec * fres * (0.5 + uVelocity);
 
     if (outA < 0.005) discard;
     gl_FragColor = vec4(col, outA);
