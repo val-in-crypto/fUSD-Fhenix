@@ -121,16 +121,16 @@ export default function Hero() {
           style={{ right: 40, top: "calc(50% - 3px)" }}
         />
 
-        {/* Interactive glossy logo, in the spec's own box: 564.15 x 599.4 at (342.5, 147.42) of
-            the 1440 x 1024 frame, given identically for the with-bill and without-bill states.
-            As fractions so it tracks the stage rather than freezing.
+        {/* Interactive glossy logo. The box is the spec's 564.15 x 599.4, kept as fractions so
+            it tracks the stage, but no longer at the spec's offsets.
 
-            This replaces a much larger slot with the mark floating inside it, which is why VIEW
-            moves with it — the on-screen size is the same, only the frame it is measured
-            against changed. The -22.35deg is the spec's too, and lives on the mesh. */}
+            The spec centres it on 43.37% / 43.66%; this sits at 46.69% / 46.83%, half way from
+            there to the middle of the stage. A deliberate departure — the mark reads as centred
+            without abandoning the composition, and moving it the whole way would put it under
+            the right-hand column. The -22.35deg is still the spec's and lives on the mesh. */}
         <div
           className="absolute"
-          style={{ left: "23.785%", top: "14.396%", width: "39.177%", height: "58.535%" }}
+          style={{ left: "27.098%", top: "17.564%", width: "39.177%", height: "58.535%" }}
         >
           <GlossyLogo />
         </div>

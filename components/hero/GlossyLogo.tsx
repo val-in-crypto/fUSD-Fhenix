@@ -13,14 +13,9 @@ import { fragmentShader, vertexShader } from "./shaders/glossyLogo";
 const BASE_ROTATION = (-22.35 * Math.PI) / 180;
 // World units across the smaller viewport edge, so larger = smaller logo.
 //
-// The canvas now occupies the spec's own box rather than a large slot with the mark floating
-// inside it, so this is set against that box: the asterisk covers 0.91 of the texture on a 1.7
-// quad, giving 1.547 / VIEW of the box's smaller edge. 2.15 puts it at 72% of the box height,
-// which is the fraction the designer's render fills its frame.
-//
-// On-screen size is unchanged from the 3.5-against-the-old-slot it replaces — 303px against
-// 305px at 1280 x 720. Only the frame it is measured against moved.
-const VIEW = 2.15;
+// Measured against the spec's box, which is what the canvas occupies: the asterisk fills 87.6%
+// of the texture's height on a 1.7 quad, so it stands 1.489 / VIEW of the box's smaller edge.
+const VIEW = 1.93;
 // Vertical FOV. Narrow on purpose: enough foreshortening for the tilt to read as depth,
 // short of the wide-angle stretch that would fight the flat, product-shot framing.
 const FOV = 30;
