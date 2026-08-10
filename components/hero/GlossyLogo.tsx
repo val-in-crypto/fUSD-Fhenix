@@ -134,7 +134,7 @@ function LogoQuad({
   // outline on screen. The cyan base earns its place back as the rest state, but only ever as a
   // colour: the outline is the note's, always.
   const [base, art, env] = useTexture([
-    "/assets/tex-base.png",
+    "/assets/tex-clear.png",
     "/assets/tex-dollar-a.png",
     "/assets/dollar.png",
   ]);
@@ -482,7 +482,7 @@ export default function GlossyLogo(props: GlossyLogoProps) {
       {!painted && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src="/assets/tex-base.png"
+          src="/assets/tex-clear.png"
           alt=""
           aria-hidden="true"
           // The cyan plate, which is what the canvas draws at rest — the note only appears under
