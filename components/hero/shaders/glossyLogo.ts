@@ -13,6 +13,11 @@
 // same reason: cross-fading two renders shot at different angles puts two outlines on screen at
 // once, which has been reported as a double asterisk more than once.
 //
+// The plate rests as plain cyan glass and fades the note in under the pointer. Both states are
+// built from this one render — the rest state is it with its print lifted out — so there is a
+// single silhouette throughout and a cross-fade cannot show two outlines, which is what the
+// old cyan base texture did.
+//
 // Every highlight added here is masked by the art's own luminance. The render's bright pixels
 // *are* its bevels, so that mask is in perfect register by construction — no second silhouette
 // to keep aligned, and no extra texture samples needed to find one.
@@ -29,9 +34,10 @@ export const fragmentShader = /* glsl */ `
   precision highp float;
 
   uniform sampler2D uArt;   // the dollar-glass asterisk — the plate itself
+  uniform sampler2D uBase;  // cyan glass, sampled for colour only; the outline is always uArt's
   uniform sampler2D uEnv;   // dollar bill, sampled as a matcap for live sheen
   uniform float uTime;
-  uniform float uHover;     // 0..1 pointer proximity; blooms the edges, moves nothing
+  uniform float uReveal;    // 0..1 pointer proximity; fades the note in, moves nothing
   uniform float uReflStrength;
   uniform float uVelocity;  // |angular velocity| -> blooms the sheen mid-spin
   uniform vec2  uRotation;  // x: spin phase, y: tilt
@@ -50,7 +56,7 @@ export const fragmentShader = /* glsl */ `
   const float GLOSS_LO = 0.94;
   const float GLOSS_HI = 0.99;
 
-  // How hard the highlights work, at rest and at full spin. uVelocity and uHover are both
+  // How hard the highlights work, at rest and at full spin. uVelocity and uReveal are both
   // clamped to 0..1 on the JS side, so these are the ends of a range rather than scale factors.
   const float EDGE_REST = 0.30;
   const float EDGE_SPIN = 1.00;
@@ -66,11 +72,31 @@ export const fragmentShader = /* glsl */ `
   // moment a highlight on glass should be moving.
   const float SPEC_SPIN = 3.0;
 
+  // Fallback tint for the few pixels of the plate the cyan render does not reach. Its own
+  // measured mean, #7ce5ed.
+  const vec3 GLASS_TINT = vec3(0.486, 0.898, 0.929);
+
+  // Fit that lands the cyan render on this one. Measured the other way round originally — the
+  // plate used to be the cyan asterisk and the note was fitted onto it, at -4.5deg and
+  // 1.068 x 0.97, which put art behind 92.9% of the base. The plate is the note now, so this is
+  // that transform inverted. Applied in image space (y down), the convention it was measured
+  // in, so the sign cannot drift.
+  const float ART_ROT = -0.0785; // -4.5deg
+  const vec2  ART_SCALE = vec2(1.068, 0.97);
+
   // Lit-end-to-dark-end falloff across the plate. uv - 0.5 reaches 0.5, so this is half the peak
   // swing. It is what keeps a fixed render from reading as a spinning sticker: the gradient is
   // laid along the counter-rotating light axis, so it holds still on screen and the arms travel
   // through it rather than carrying it around with them.
   const float DEPTH_GRADIENT = 0.40;
+
+  // Inverse of the fit: into image space, scale, rotate back, out again.
+  vec2 baseUv(vec2 uv) {
+    vec2 p = (vec2(uv.x, 1.0 - uv.y) - 0.5) * ART_SCALE;
+    float c = cos(-ART_ROT), s = sin(-ART_ROT);
+    vec2 q = vec2(c * p.x + s * p.y, -s * p.x + c * p.y) + 0.5;
+    return vec2(q.x, 1.0 - q.y);
+  }
 
   void main() {
     vec2 uv = vUv;
@@ -80,7 +106,7 @@ export const fragmentShader = /* glsl */ `
     vec4 art = texture2D(uArt, uv);
     if (art.a < 0.005) discard;
 
-    vec3 col = art.rgb;
+    vec3 note = art.rgb;
     float outA = art.a;
 
     float ang = uRotation.x;
@@ -93,11 +119,34 @@ export const fragmentShader = /* glsl */ `
     float lightPhase = LIGHT_ANGLE - ang;
     vec2 dir = vec2(cos(lightPhase), sin(lightPhase));
 
-    // The art's bevels, straight off its own luminance.
-    float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
+    // Read off the note, not off the blend below, so the bevels sit in the same places whether
+    // the print is showing or not — only the print crosses over, never the glass.
+    float lum = dot(note, vec3(0.2126, 0.7152, 0.0722));
     float gloss = smoothstep(GLOSS_LO, GLOSS_HI, lum);
 
-    float edgeGain = EDGE_REST + EDGE_SPIN * uVelocity + EDGE_HOVER * uHover;
+    // The plate at rest, taken from the cyan render's colour but never from its alpha.
+    //
+    // Lifting the note out of this render by luminance was tried first and does not work: its
+    // chamfers are not separable from its paper by brightness, so the plate came out as a flat
+    // cyan blob with no bevels. Sampling the real cyan glass gets its modelling back. Taking
+    // only its colour is what keeps the double asterisk away — the two are different shapes,
+    // about a fifth apart on silhouette, so if its alpha reached the output the outline would
+    // morph as the note came up. It never does; outA is the note's throughout.
+    vec2 bUv = baseUv(uv);
+    vec4 b = texture2D(uBase, bUv);
+    float inFrame = step(0.0, bUv.x) * step(bUv.x, 1.0) * step(0.0, bUv.y) * step(bUv.y, 1.0);
+    // The cyan render draws at alpha 0.7 over a white page, so compositing it against white is
+    // what makes it look the way it looked there.
+    vec3 cyan = mix(vec3(1.0), b.rgb, b.a);
+    // The fit reaches about 93% of the plate; the rest is arm tip and takes the flat tint,
+    // feathered in by the same alpha so it reads as glass rather than as a seam.
+    vec3 glass = mix(GLASS_TINT, cyan, smoothstep(0.05, 0.5, b.a) * inFrame);
+
+    // uReveal is pointer proximity alone: the note answers hover and nothing else, so spinning
+    // the plate no longer brings it up uninvited.
+    vec3 col = mix(glass, note, uReveal);
+
+    float edgeGain = EDGE_REST + EDGE_SPIN * uVelocity + EDGE_HOVER * uReveal;
 
     // Body gradient. Applied before the additive terms so it shades the render itself rather
     // than the highlights laid on top of it.

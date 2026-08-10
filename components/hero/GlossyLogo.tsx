@@ -34,10 +34,9 @@ const DEFAULTS = {
   idleSpeed: 0.5,
   scrollReveal: 0.9, // ceiling of scroll's contribution to the reveal; 0 disables it
   idleTilt: 0.55, // fraction of tiltClamp used by the resting wobble; 0 = flat spin only
-  // Ceiling on the edge bloom reached when the pointer is over the logo or the plate is turned
-  // right off-axis. It used to gate the note; the note is always shown now, so this scales how
-  // much extra light the glass catches instead. 0 leaves the render entirely alone.
-  edgeBloom: 1,
+  // Ceiling on the note reveal, reached when the pointer is over the logo. The plate rests as
+  // plain cyan glass and fades the engraving in as the cursor arrives; 0 leaves it cyan.
+  dollarReveal: 1,
   // How far the plate leans toward the cursor on approach, as a fraction of tiltClamp.
   //
   // Off. The lean tilted the plate to face the pointer, which both moved it and foreshortened
@@ -71,7 +70,9 @@ const ALPHA_HIT = 40;
 // a full turn in ~63s (luxury-watch pace).
 const IDLE_VEL = 0.2;
 
-const FALLBACK_STYLE: React.CSSProperties = { transform: "rotate(-25.98deg)", opacity: 0.7 };
+// No extra opacity here: tex-base.png already carries the cyan render's own alpha 0.7, and
+// stacking the two took it to 0.49 and a visibly fainter plate than the canvas draws.
+const FALLBACK_STYLE: React.CSSProperties = { transform: "rotate(-25.98deg)" };
 
 export type GlossyLogoProps = {
   reflStrength?: number;
@@ -80,7 +81,7 @@ export type GlossyLogoProps = {
   idleSpeed?: number;
   scrollReveal?: number;
   idleTilt?: number;
-  edgeBloom?: number;
+  dollarReveal?: number;
   hoverLean?: number;
 };
 
@@ -118,7 +119,7 @@ function LogoQuad({
   idleSpeed,
   scrollReveal,
   idleTilt,
-  edgeBloom,
+  dollarReveal,
   hoverLean,
   reducedMotion,
   onReady,
@@ -128,25 +129,32 @@ function LogoQuad({
   const maxTilt = (tiltClamp * Math.PI) / 180;
   const ready = useRef(false);
 
-  // Two textures where there were five. The cyan base, its normal map and the second angle
-  // frame all existed to reconstruct the note onto a different asterisk; the render carries its
-  // own bevels and its own outline, so none of them have anything left to do.
-  const [art, env] = useTexture(["/assets/tex-dollar-a.png", "/assets/dollar.png"]);
+  // Three textures where there were five. The normal map and the second angle frame are gone
+  // for good — one existed to light a shape that is no longer the plate, the other put a second
+  // outline on screen. The cyan base earns its place back as the rest state, but only ever as a
+  // colour: the outline is the note's, always.
+  const [art, base, env] = useTexture([
+    "/assets/tex-dollar-a.png",
+    "/assets/tex-base.png",
+    "/assets/dollar.png",
+  ]);
   art.colorSpace = THREE.SRGBColorSpace;
+  base.colorSpace = THREE.SRGBColorSpace;
   env.colorSpace = THREE.SRGBColorSpace;
   env.wrapS = env.wrapT = THREE.RepeatWrapping;
 
   const uniforms = useMemo(
     () => ({
       uArt: { value: art },
+      uBase: { value: base },
       uEnv: { value: env },
       uTime: { value: 0 },
-      uHover: { value: 0 },
+      uReveal: { value: 0 },
       uReflStrength: { value: reflStrength },
       uVelocity: { value: 0 },
       uRotation: { value: new THREE.Vector2(0, 0) },
     }),
-    [art, env],
+    [art, base, env],
   );
   uniforms.uReflStrength.value = reflStrength;
 
@@ -376,13 +384,9 @@ function LogoQuad({
     }
     uniforms.uRotation.value.set(spin.current + tilt.current.x, tilt.current.y);
 
-    // How far the user has actually turned the plate off-axis, 0..1. Read off the drag tilt
-    // alone, not the composed tiltX/tiltY: those carry the idle wobble, which never stops.
-    const turn = Math.min(1, Math.hypot(tilt.current.x, tilt.current.y) / maxTilt);
-    // Hover and turn now bloom the *edges* rather than gating the note — the note is simply
-    // always there. So approaching the plate makes its glass catch more light, which answers
-    // the cursor without moving or foreshortening the mark.
-    uniforms.uHover.value = edgeBloom * Math.max(hover.current, turn);
+    // Hover alone. Turn used to count toward this, which meant spinning the plate brought the
+    // note up on its own; the note is the answer to the pointer and to nothing else now.
+    uniforms.uReveal.value = dollarReveal * hover.current;
     uniforms.uVelocity.value = vel.current;
     uniforms.uTime.value = reducedMotion ? 0 : state.clock.elapsedTime;
 
@@ -457,12 +461,11 @@ export default function GlossyLogo(props: GlossyLogoProps) {
       {!painted && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src="/assets/tex-dollar-a.png"
+          src="/assets/tex-base.png"
           alt=""
           aria-hidden="true"
-          // Same texture the canvas draws, so the handoff is invisible — it used to be the cyan
-          // asterisk, which is a different render and a different silhouette, so the swap
-          // flashed one plate into another.
+          // The cyan plate, which is what the canvas draws at rest — the note only appears under
+          // the pointer, and there is no pointer before the canvas has painted.
           //
           // 48.57% is the quad's own share of the frame: it is 1.7 world units against a VIEW
           // of 3.5. Capping both axes rather than setting a width makes that a share of the
@@ -491,7 +494,7 @@ export default function GlossyLogo(props: GlossyLogoProps) {
             idleSpeed={settings.idleSpeed}
             scrollReveal={settings.scrollReveal}
             idleTilt={settings.idleTilt}
-            edgeBloom={settings.edgeBloom}
+            dollarReveal={settings.dollarReveal}
             hoverLean={settings.hoverLean}
             reducedMotion={reduced}
             onReady={() => setPainted(true)}
