@@ -274,6 +274,18 @@ function LogoQuad({
     el.style.touchAction = "none";
 
     const onMove = (e: PointerEvent) => {
+      // Backstop for the reveal. R3F only knows the pointer left the plate if the canvas is
+      // still receiving events, so a cursor that exits the window, or a page that scrolls the
+      // canvas out from under a cursor that has not moved, can leave the note showing with
+      // nothing hovering it. This is window-level and rect-based, so neither case sticks.
+      const r = canvasRect.current;
+      if (r) {
+        const inside =
+          e.clientX >= r.left && e.clientX <= r.right &&
+          e.clientY >= r.top && e.clientY <= r.bottom;
+        if (!inside) hoverTarget.current = 0;
+      }
+
       if (!dragging.current) return;
       const now = performance.now();
       const dt = Math.max(16, now - last.current.t) / 1000;
@@ -298,11 +310,20 @@ function LogoQuad({
       } catch {}
     };
 
+    // Leaving the document entirely fires neither a move nor an out on the canvas.
+    const onLeave = () => {
+      hoverTarget.current = 0;
+    };
+
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+    document.addEventListener("pointerleave", onLeave);
+    window.addEventListener("blur", onLeave);
     return () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      document.removeEventListener("pointerleave", onLeave);
+      window.removeEventListener("blur", onLeave);
     };
   }, [gl, reducedMotion]);
 
