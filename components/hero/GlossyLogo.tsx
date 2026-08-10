@@ -116,25 +116,26 @@ function LogoQuad({
   const maxTilt = (tiltClamp * Math.PI) / 180;
   const ready = useRef(false);
 
-  const [base, normal, bill, env] = useTexture([
+  const [base, normal, dollarA, dollarB, env] = useTexture([
     "/assets/tex-base.png",
     "/assets/tex-normal.png",
-    "/assets/bill-100.png",
+    "/assets/tex-dollar-a.png",
+    "/assets/tex-dollar-b.png",
     "/assets/dollar.png",
   ]);
   base.colorSpace = THREE.SRGBColorSpace;
-  bill.colorSpace = THREE.SRGBColorSpace;
+  dollarA.colorSpace = THREE.SRGBColorSpace;
+  dollarB.colorSpace = THREE.SRGBColorSpace;
   env.colorSpace = THREE.SRGBColorSpace;
   normal.colorSpace = THREE.NoColorSpace;
   env.wrapS = env.wrapT = THREE.RepeatWrapping;
-  // uBill needs no wrap mode: the fragment shader clamps its UV, so parallax runs off the
-  // edge of the print instead of wrapping a second Franklin into view.
 
   const uniforms = useMemo(
     () => ({
       uBase: { value: base },
       uNormal: { value: normal },
-      uBill: { value: bill },
+      uDollarA: { value: dollarA },
+      uDollarB: { value: dollarB },
       uEnv: { value: env },
       uTime: { value: 0 },
       uReveal: { value: 0 },
@@ -143,7 +144,7 @@ function LogoQuad({
       uVelocity: { value: 0 },
       uRotation: { value: new THREE.Vector2(0, 0) },
     }),
-    [base, normal, bill, env], // eslint-disable-line react-hooks/exhaustive-deps
+    [base, normal, dollarA, dollarB, env], // eslint-disable-line react-hooks/exhaustive-deps
   );
   uniforms.uReflStrength.value = reflStrength;
 
