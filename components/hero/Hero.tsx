@@ -1,7 +1,6 @@
 import Socials from "@/components/ui/Socials";
 import WaitlistPill from "@/components/ui/WaitlistPill";
 import { ArrowDown, ArrowEnter } from "./icons";
-import HeroGlass from "./HeroGlass";
 
 /**
  * fUSD hero — faithful rebuild of Figma "Landing page" (94:3), top 1024px.
@@ -138,14 +137,15 @@ export default function Hero() {
             put both on screen at half opacity through the middle of every cycle — two
             asterisks at two different angles, overlapping. A cross-fade needs its two frames
             near-aligned to read as one object; these are 20-odd degrees apart, so it read as
-            a double exposure. The rotation carries the movement on its own.
+            a double exposure.
 
-            Both placements the designer gave are the same layer at the same angle, differing
-            by a -14.9, -14.4px drift and a 1.7% wider / 2.0% shorter box. That delta is the
-            secondary motion, on the child below; the turn itself is a full rotation. Keyframes
-            in globals.css — see .hero-glass. */}
-        <HeroGlass
-          className="absolute"
+            It turns in place, and only turns. The drift built from the designer's two
+            placements used to run underneath it — a 9s translate and swell — which on top of
+            the rotation read as the plate wandering rather than spinning. Keyframes in
+            globals.css. */}
+        <div
+          aria-hidden="true"
+          className="hero-glass pointer-events-none absolute select-none"
           style={{
             left: "29.442%",
             top: "25.912%",
@@ -153,7 +153,10 @@ export default function Hero() {
             height: "58.535%",
             transform: "rotate(-22.35deg)",
           }}
-        />
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/assets/hero-glass.png" alt="" className="absolute inset-0 h-full w-full" />
+        </div>
 
         {/* ◐USD lockup */}
         <div className="absolute" style={{ left: 39, top: "2.539%" }}>
@@ -302,7 +305,13 @@ export default function Hero() {
             No rotation here — the desktop -22.35deg is part of a composition this stack does
             not reproduce, and tilting it inside a narrow column just costs width. */}
         <div className="relative mx-auto mt-4 w-full max-w-[380px] flex-1 min-h-0">
-          <HeroGlass className="absolute inset-0" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/assets/hero-glass.png"
+            alt=""
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 h-full w-full object-contain select-none"
+          />
         </div>
 
         {/* Same status line. It cannot share the CTA's row here — pill, line and socials

@@ -301,9 +301,15 @@ body {
    designer's resting angle is the phase the loop begins on. Linear, because an
    eased spin reads as something being animated rather than something turning.
 
-   The rotation lives on its own layer. One element cannot animate transform
-   twice — a second declaration replaces the first, it does not compose — so the
-   drift below is applied to a child and the two multiply out naturally. */
+   Turning is all it does. A second animation used to drift and swell the plate
+   underneath this one, built from the delta between the designer's two
+   placements — but on top of a rotation that reads as the whole thing wandering
+   rather than spinning in place, so it is gone.
+
+   transform-origin is the art's own centre, not the box's. The asterisk sits at
+   48% / 48.5% of its PNG, so spinning about the box centre swings it through a
+   small orbit — about 11px across at the desktop size — instead of turning on
+   the spot. */
 @keyframes hero-glass-spin {
   from {
     transform: rotate(-22.35deg);
@@ -313,64 +319,18 @@ body {
   }
 }
 
-/* The secondary move, from the designer's two placements: drift up-left, box
-   wider and shorter. Their literal delta is 14.9px on a 564px box — 2.6% over
-   9 seconds, 0.028px per frame — so it is direction and proportion taken from
-   them, scaled 2.5x to something the eye can follow. No rotation here: the
-   parent owns that, and the angle change also comes from crossing to the second
-   render, which is a genuinely different angle.
-
-   Drift is a percentage of the element's own box, so it tracks the stage the
-   same way the box does. */
-@keyframes hero-glass-turn {
-  to {
-    transform: translate(-6.603%, -6.018%) scale(1.043, 0.9505);
-  }
-}
-
 .hero-glass {
+  transform-origin: 48% 48.5%;
   animation: hero-glass-spin 60s linear infinite;
   will-change: transform;
 }
 
-.hero-glass-drift {
-  animation: hero-glass-turn 9s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
-  will-change: transform;
-}
-
-/* Franklin, on hover.
-   Clipped to the cyan plate's own alpha. The two renders are different asterisks
-   underneath — the arms differ in proportion, about 22% of the silhouette — so
-   stacking them and cross-fading puts both outlines on screen through the middle
-   of every fade, which reads as two asterisks. Masking removes the second
-   silhouette entirely: the base's shape is the only shape, and the bill just
-   fills it. */
-.hero-glass-bill {
-  transition: opacity 260ms cubic-bezier(0.16, 1, 0.3, 1);
-  -webkit-mask-image: url("/assets/hero-glass-rest.png");
-  mask-image: url("/assets/hero-glass-rest.png");
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-}
-
-/* The bill render sits at a different angle and scale to the plate it is filling.
-   Measured by maximising how much of the base has art behind it: -4.5deg at
-   1.068 x 0.97 takes that from 88.8% to 92.9%. The transform is on the art and
-   the mask on its parent, deliberately — put both on one element and the mask
-   rotates with the art, which is what it is meant to be pinning it against. */
-.hero-glass-bill-art {
-  transform: rotate(-4.5deg) scale(1.068, 0.97);
-}
-
-/* CLAUDE.md is explicit that reduced motion gets no idle drift — and a plate
-   turning on its own is exactly that. Dropping the animations leaves the outer
-   element on its inline transform, which is the spec's resting -22.35deg, so
-   the resting state does not have to be restated here. */
+/* CLAUDE.md is explicit that reduced motion gets no idle motion — and a plate
+   turning on its own is exactly that. Dropping the animation leaves the element
+   on its inline transform, the spec's resting -22.35deg, so the resting state
+   does not have to be restated here. */
 @media (prefers-reduced-motion: reduce) {
-  .hero-glass,
-  .hero-glass-drift {
+  .hero-glass {
     animation: none;
   }
 }
