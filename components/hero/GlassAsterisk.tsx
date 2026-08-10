@@ -40,11 +40,25 @@ const SET_YAW = -0.19;
  *  not get a new Color object every render and rebuild its uniforms. */
 const PAGE_WHITE = new THREE.Color("#ffffff");
 
+/**
+ * How far back the camera sits, which is the only thing setting the plate's on-screen size.
+ *
+ * Measured off the designer's render rather than dialled in: in hero-glass.png the asterisk
+ * fills 68% of the frame's width and 72% of its height, and that PNG is placed at the box this
+ * canvas occupies. Filling the frame the way this did at 4.2 made the plate about a third
+ * larger than the design and left it no air. 5.75 is 4.2 / 0.73, and 0.73 is the ratio those
+ * measurements ask for.
+ *
+ * Distance rather than a scale on the mesh: the transmission material's thickness is in world
+ * units, so shrinking the geometry would thin the glass and wash the tint out as a side effect.
+ */
+const CAMERA_Z = 5.75;
+
 function Plate({ reduced }: { reduced: boolean }) {
   const ref = useRef<THREE.Mesh>(null);
   const bill = useTexture("/assets/dollar.png");
 
-  const outer = useMemo(() => asteriskGeometry({ tipRadius: 1, depth: 0.34, bevel: 0.055 }), []);
+  const outer = useMemo(() => asteriskGeometry({ tipRadius: 1, depth: 0.34, bevel: 0.09 }), []);
   // The note, as a wafer sitting inside the glass rather than printed on it. Being inside the
   // volume is what makes the outer surface refract it — the reason for real geometry in the
   // first place — and it can never show outside the silhouette, which is what every flat
@@ -59,13 +73,15 @@ function Plate({ reduced }: { reduced: boolean }) {
     // wafer of tip radius 0.93 they run -0.93..0.93, a span of 1.86. Offset is therefore 0.5
     // to centre, and repeat is (region size) / 1.86 rather than anything near 1.
     //
-    // The region is Franklin: u 0.12..0.50 of the note, v 0.05..0.95. The full note is 2.376:1
-    // against a square plate, so something has to be cropped, and the portrait is the half
-    // worth showing — the other half is the note's blank field. The two repeats are then set
-    // to put the same number of texels on each world axis (0.204 x 1024 = 209, 0.484 x 431 =
-    // 209), so the portrait is cropped rather than squashed.
-    t.repeat.set(0.204, 0.484);
-    t.offset.set(0.31, 0.5);
+    // The region is what the designer's render shows: Franklin, plus the block of lettering to
+    // his right, u 0.30..0.78 of the note. Cropping to the portrait alone left the arms as
+    // plain glass, where the design carries engraving right out to the tips.
+    //
+    // Vertically it takes the whole note, which stretches it about 14%. That is deliberate —
+    // fitting the height honestly would need 0.613, which overruns the note and clamps into
+    // bands, and Franklin is visibly elongated in the designer's render too.
+    t.repeat.set(0.258, 0.538);
+    t.offset.set(0.54, 0.5);
     t.needsUpdate = true;
     return t;
   }, [bill]);
@@ -100,7 +116,7 @@ function Plate({ reduced }: { reduced: boolean }) {
         // through the middle came out several times denser than the arms, which is what put a
         // dark band across the plate.
         thickness={0.3}
-        attenuationDistance={1.1}
+        attenuationDistance={1.15}
         ior={1.45}
         chromaticAberration={0.06}
         anisotropy={0.1}
@@ -108,11 +124,22 @@ function Plate({ reduced }: { reduced: boolean }) {
         distortion={0.15}
         distortionScale={0.3}
         temporalDistortion={0}
-        color={"#cdf6f8"}
-        attenuationColor={"#12cbd1"}
+        color={"#d4f9fb"}
+        attenuationColor={"#15cfd5"}
       />
       <mesh geometry={inner}>
-        <meshBasicMaterial map={billMap} transparent opacity={0.7} toneMapped={false} />
+        {/* Tinted, not shown straight. The note's own paper is warm and its portrait is
+            photographic, so at full strength it reads as a picture stuck to the plate rather
+            than something suspended in it — which is the one thing the designer's render is
+            not. The colour multiplies the map, so the warm paper goes to pale aqua and the
+            engraving stays dark, and the glass in front finishes the job. */}
+        <meshBasicMaterial
+          map={billMap}
+          color={"#8fd4e8"}
+          transparent
+          opacity={0.88}
+          toneMapped={false}
+        />
       </mesh>
     </mesh>
   );
@@ -203,7 +230,7 @@ export default function GlassAsterisk({
           gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
           dpr={[1, 2]}
           frameloop={visible ? "always" : "never"}
-          camera={{ position: [0, 0, 4.2], fov: 28 }}
+          camera={{ position: [0, 0, CAMERA_Z], fov: 28 }}
         >
           <Studio />
           <Plate reduced={reduced} />
