@@ -1,11 +1,11 @@
 import Socials from "@/components/ui/Socials";
 import WaitlistPill from "@/components/ui/WaitlistPill";
+import GlossyLogo from "./GlossyLogo";
 import { ArrowDown, ArrowEnter } from "./icons";
-import GlassAsterisk from "./GlassAsterisk";
 
 /**
  * fUSD hero — faithful rebuild of Figma "Landing page" (94:3), top 1024px.
- * The logo is the designer's dollar-glass render, placed to the Figma spec (static).
+ * The logo is the interactive <GlossyLogo> canvas (drag to spin, dollar reveals).
  *
  * Desktop (>= md): exact fluid anchors as exported by Figma (calc(% + px)).
  * Mobile (< md): stacked reflow — decorative marks hidden, logo centered.
@@ -121,28 +121,15 @@ export default function Hero() {
           style={{ right: 40, top: "calc(50% - 3px)" }}
         />
 
-        {/* Real geometry now, not a picture of it. Everything before this rotated a flat
-            render, which is where the fake turn, the mismatched silhouettes and the double
-            image all came from. Shape is fitted to the designer's render — see
-            ./asteriskGeometry — and the note sits inside the glass as a wafer, so the outer
-            surface refracts it and it can never appear outside the outline.
-
-            Box is the spec's 564.15 x 599.4 of the 1440 x 1024 frame, as fractions so it
-            tracks the stage. The spec's own offsets are not used: taken literally they centre
-            the art at 43.4% / 43.7%, which runs it through the headline. Centred on
-            49.03% / 55.18% instead, where the logo has actually sat.
-
-            The -22.35deg roll now lives in the scene as the mesh's own Z rotation, alongside
-            a real turn about Y. */}
-        <GlassAsterisk
-          className="pointer-events-none absolute select-none"
-          style={{
-            left: "29.442%",
-            top: "25.912%",
-            width: "39.177%",
-            height: "58.535%",
-          }}
-        />
+        {/* Interactive glossy logo */}
+        <div
+          className="absolute"
+          // Width as a fraction of the stage (1082/1440), not frozen px: below the 1440
+          // design width a fixed 1082 runs past the right edge — 119px of it at 1100.
+          style={{ left: "calc(8.33% + 45px)", top: "7.324%", width: "75.139%", height: "95.703%" }}
+        >
+          <GlossyLogo />
+        </div>
 
         {/* ◐USD lockup */}
         <div className="absolute" style={{ left: 39, top: "2.539%" }}>
@@ -286,12 +273,9 @@ export default function Hero() {
         </div>
 
         {/* min-h-0 is load-bearing: a flex item's default min-height:auto would let the
-            image's intrinsic size win and push the CTA back off the screen. object-contain
-            so it fits whatever the flex row leaves, without cropping.
-            No rotation here — the desktop -22.35deg is part of a composition this stack does
-            not reproduce, and tilting it inside a narrow column just costs width. */}
+            canvas's intrinsic size win and push the CTA back off the screen. */}
         <div className="relative mx-auto mt-4 w-full max-w-[380px] flex-1 min-h-0">
-          <GlassAsterisk className="pointer-events-none absolute inset-0 select-none" />
+          <GlossyLogo />
         </div>
 
         {/* Same status line. It cannot share the CTA's row here — pill, line and socials

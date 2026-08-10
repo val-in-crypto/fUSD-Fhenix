@@ -20,25 +20,13 @@ as the user turns it.
 - **Source of truth for all measurements is the Figma MCP.** Pull exact specs from
   `get_design_context` / `get_metadata` on `40:4`; if a number here disagrees, Figma wins.
 
-## The asterisk is now real geometry (supersedes the old flat-PNG constraint)
+## Hard constraint (read first)
 
-This used to read "we only have flat PNG renders — no 3D geometry". That is no longer true.
-`components/hero/asteriskGeometry.ts` builds the asterisk procedurally and
-`components/hero/GlassAsterisk.tsx` renders it through a transmission material, so the plate
-has sides, thickness and real refraction.
-
-The shape is **fitted, not traced**: six flat-tipped arms with radiused corners on a regular
-60° grid, scored against the alpha of `tex-base.png` by intersection-over-union. It lands at
-**IoU 0.936**. Do not adjust `ARM_PHASE_DEG`, `ARM_HALF_WIDTH` or `TIP_CORNER` by eye — re-run
-the fit. Two degrees of phase is worth 0.038 of IoU, because six arms all miss at once.
-
-- **Motion is an in-plane spin (Z), on the spot, 60s linear** — the same turn the CSS version
-  ran, which is what was signed off. Pitch and yaw are a fixed three-quarter set. Spinning
-  about Y reads as a coin flipping, not an asterisk turning.
-- The **reflection** still sells the glossiness, but it is now physical: the note is a wafer
-  *inside* the volume, so the outer surface refracts it and it can never escape the silhouette
-  — which is what every flat compositing attempt kept failing at.
-- The pre-rendered PNGs remain the **no-WebGL fallback**, not the primary.
+We only have **flat PNG renders** of the asterisk — no 3D geometry. Therefore:
+- **No** true 3D orbit (it has no back/sides; it vanishes edge-on).
+- Interaction is **faux-3D grab-and-turn**: real in-plane spin (Z) + a small **clamped
+  tilt (±~30°)** faked in-shader, with **inertia/flick physics**.
+- The **reflection** sells the glossiness. Invest there.
 
 ## Reflection approach — HYBRID (decided)
 
