@@ -14,9 +14,18 @@
 // once, which has been reported as a double asterisk more than once.
 //
 // The plate rests as cyan glass and fades the note in under the pointer, across its whole face
-// rather than behind a sweeping terminator. The cyan render is the plate throughout — its
-// outline, its alpha — and the note is colour only, so the silhouette never moves and a
-// cross-fade cannot put two outlines on screen.
+// rather than behind a sweeping terminator.
+//
+// tex-glass.png is the cyan render rescaled offline to the note's own bounding box, so both
+// states stand at the same height and the same proportion. That is a plain resize and costs
+// nothing in sharpness.
+//
+// It does not make them the same shape. The two renders are different asterisks whose arms
+// differ in proportion, and nothing gets their silhouettes past IoU 0.8323 — the leftover shows
+// as arm tips the note does not quite reach. Warping one onto the other per angle was tried and
+// does reach 0.9983, but a radial warp bends straight arm edges into curves and the result is a
+// visibly melted asterisk. Matching the box is as far as this can honestly go; matching the
+// shape needs both renders out of one 3D scene.
 //
 // Highlights are masked by the luminance of whatever is currently on screen, so they are in
 // register with it in both states, with no second silhouette to keep aligned. They fade out as
@@ -72,22 +81,17 @@ export const fragmentShader = /* glsl */ `
   // moment a highlight on glass should be moving.
   const float SPEC_SPIN = 3.0;
 
-  // Fit that lands the note on the plate, from a direct search over rotation, scale and
-  // translation maximising intersection-over-union of the two alphas: IoU 0.8321, against
-  // 0.7785 for leaving it alone.
-  //
-  // The plate is the cyan render and the note is fitted onto it, never the other way round.
-  // Inverting this to make the note the plate was tried and is worse than doing nothing — it
-  // scored 0.7166 — and either way the residual is real: these are different asterisks whose
-  // arms differ in proportion, so no rigid transform gets past about 0.83. Fitting the note
-  // into the plate hides that in the interior, where it is print on print; fitting the plate
-  // into the note puts it on the bevels, where it reads as edges that miss the outline.
+  // Residual fit, after the plate was rescaled offline to the note's own bounding box. Scale is
+  // now essentially identity — 1.02 and 1.01 — so the note is shown at its true proportions and
+  // only needs turning into place. It used to carry 0.9375 x 1.0156, squashing the note to fit
+  // a plate that was the wrong shape for it; the plate is adapted to the note now instead,
+  // which is the right way round because the note is the more sharply drawn of the two.
   //
   // Applied in image space (y down), the convention it was measured in, so the sign cannot
   // drift.
-  const float ART_ROT = -0.0844; // -4.834deg
-  const vec2  ART_SCALE = vec2(0.9375, 1.0156);
-  const vec2  ART_OFFSET = vec2(-0.0200, 0.0050);
+  const float ART_ROT = -0.0813; // -4.655deg
+  const vec2  ART_SCALE = vec2(1.0202, 1.0108);
+  const vec2  ART_OFFSET = vec2(-0.0176, 0.0073);
 
   // Lit-end-to-dark-end falloff across the plate. uv - 0.5 reaches 0.5, so this is half the peak
   // swing. It is what keeps a fixed render from reading as a spinning sticker: the gradient is
@@ -135,9 +139,9 @@ export const fragmentShader = /* glsl */ `
     float lightPhase = LIGHT_ANGLE - ang;
     vec2 dir = vec2(cos(lightPhase), sin(lightPhase));
 
-    // The note, fitted in. Its alpha is coverage only and never reaches the output, so the
-    // outline cannot move as it comes up; sampling off its edge gives 0, which feathers the arm
-    // tips back to glass.
+    // The note. Its alpha is coverage only and never reaches the output, so the outline cannot
+    // move as it comes up; sampling off its edge gives 0, which feathers the arm tips rather
+    // than cutting them.
     vec2 aUv = artUv(uv);
     vec4 art = texture2D(uArt, aUv);
     float artCover = smoothstep(0.05, 0.5, art.a)
