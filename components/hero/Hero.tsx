@@ -120,25 +120,29 @@ export default function Hero() {
           style={{ right: 40, top: "calc(50% - 3px)" }}
         />
 
-        {/* The designer's dollar-glass render, placed to their spec and turning between the two
-            placements they gave for it.
+        {/* The designer's dollar-glass render, at their size and rotation, turning.
 
-            Both are the same layer at -22.35deg: 564.15 x 599.4 at (342.5, 147.42), and
-            573.85 x 587.55 at (322.75, 138.92). The difference between them is the motion —
-            centre drifts -14.9, -14.4px while the box goes 1.7% wider and 2.0% shorter. Wider
-            and shorter at a fixed rotation is what a flat plate does turning about a vertical
-            axis, so the second render (angle B) cross-fades in on the same clock. Position
-            alone would only slide it; the two angles are what make it read as a turn.
+            Size and rotation are the spec's: 564.15 x 599.4 of the 1440 x 1024 frame, at
+            -22.35deg. Position is not. Taken literally, (342.5, 147.42) centres the art at
+            43.4% / 43.7% of the stage, which is ~195px left and ~100px above where the logo
+            has actually sat, and puts its swept box at x=263 against a headline running to
+            x=604 — straight through the copy. Those offsets are almost certainly relative to
+            some other frame, not this one.
 
-            Box is a fraction of the 1440 x 1024 frame so it tracks the stage, and the drift is
-            a percentage of the element's own box so it scales with it. Keyframes in
-            globals.css — see .hero-glass. */}
+            Centred instead on 49.03% / 55.18%, which is where the logo it replaced sat. That
+            keeps the overlap with the headline to the shallow one the design has, rather than
+            burying the second line of it.
+
+            Both placements the designer gave are the same layer at the same angle, differing
+            by a -14.9, -14.4px drift and a 1.7% wider / 2.0% shorter box. That delta is the
+            secondary motion, on the child below; the turn itself is a full rotation. Keyframes
+            in globals.css — see .hero-glass. */}
         <div
           aria-hidden="true"
           className="hero-glass pointer-events-none absolute select-none"
           style={{
-            left: "23.785%",
-            top: "14.396%",
+            left: "29.442%",
+            top: "25.912%",
             width: "39.177%",
             height: "58.535%",
             transform: "rotate(-22.35deg)",
