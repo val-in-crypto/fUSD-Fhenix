@@ -133,6 +133,12 @@ export default function Hero() {
             keeps the overlap with the headline to the shallow one the design has, rather than
             burying the second line of it.
 
+            One render only. The second angle frame used to cross-fade over this one, which
+            put both on screen at half opacity through the middle of every cycle — two
+            asterisks at two different angles, overlapping. A cross-fade needs its two frames
+            near-aligned to read as one object; these are 20-odd degrees apart, so it read as
+            a double exposure. The rotation carries the movement on its own.
+
             Both placements the designer gave are the same layer at the same angle, differing
             by a -14.9, -14.4px drift and a 1.7% wider / 2.0% shorter box. That delta is the
             secondary motion, on the child below; the turn itself is a full rotation. Keyframes
@@ -154,12 +160,6 @@ export default function Hero() {
           <div className="hero-glass-drift absolute inset-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/assets/hero-glass.png" alt="" className="absolute inset-0 h-full w-full" />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/assets/hero-glass-b.png"
-              alt=""
-              className="hero-glass-b absolute inset-0 h-full w-full"
-            />
           </div>
         </div>
 
