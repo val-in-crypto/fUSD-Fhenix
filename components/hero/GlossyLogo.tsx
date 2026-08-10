@@ -47,10 +47,27 @@ const SCROLL_REF = 1400;
 // Per 1/60 s falloff of the scroll signal once the page stops moving. Slower than the
 // spin's inertiaDecay so the reflection lingers a beat instead of snapping off.
 const SCROLL_DECAY = 0.88;
-// Rad/s of the resting tilt wobble. The two axes run at different rates so they trace a
-// slow lissajous rather than a repeating figure-eight.
-const IDLE_TILT_SPEED = 0.42;
-const IDLE_TILT_RATIO = 0.68; // second axis rate, relative to the first
+// A slow breath on the idle spin rate. A perfectly constant rate is most of what reads as
+// machinery — a real object turning under its own momentum is never quite metronomic — and the
+// period here is deliberately unrelated to the turn's, so the two never resolve into a pattern
+// the eye can follow.
+const IDLE_BREATH = 0.18; // fraction of the idle rate
+const IDLE_BREATH_SPEED = 0.19; // rad/s
+
+// Precession, replacing the lissajous the resting wobble used to trace.
+//
+// The lissajous ran on fixed axes at a rate of its own, which is why the wobble and the turn
+// read as two mechanisms side by side rather than one object. A body spinning about an axis
+// slightly off its own does something specific instead: the lean *travels* around it as it
+// turns. Tying the lean's direction to the spin phase is what makes the two one motion.
+//
+// The rate is a fraction of the spin rather than a multiple, so the lean never returns to the
+// same place at the same point in a revolution, and a slow drift is added on top so it does not
+// close even over many turns.
+const PRECESS_RATE = 0.31; // lean direction, relative to spin phase
+const PRECESS_DRIFT = 0.11; // rad/s, so the precession never resolves against the spin
+const PRECESS_BREATH = 0.27; // how much the lean's depth varies
+const PRECESS_BREATH_SPEED = 0.13; // rad/s
 const HOVER_EASE = 6; // approach rate per second toward the measured proximity
 // Resolution of the alpha lookup built from the base texture. The hover tests this rather
 // than the quad the asterisk is drawn on: the quad is square and the asterisk does not fill
@@ -331,6 +348,8 @@ function LogoQuad({
     const dt = Math.min(delta, 0.05);
     const f = dt * 60;
 
+    const t = reducedMotion ? 0 : state.clock.elapsedTime;
+
     if (!dragging.current) {
       if (reducedMotion) {
         spinVel.current = 0;
@@ -339,7 +358,11 @@ function LogoQuad({
         // the last-flicked direction. A flick blooms, then decays gently back to idle — no
         // snap, no overshoot. In-plane (Z) spin only: the asterisk is a flat plate, so a
         // Y-axis turn would send it edge-on and vanish (CLAUDE.md hard constraint).
-        const idleVel = idleSpeed * IDLE_VEL * idleDir.current;
+        const idleVel =
+          idleSpeed *
+          IDLE_VEL *
+          idleDir.current *
+          (1 + IDLE_BREATH * Math.sin(t * IDLE_BREATH_SPEED));
         spinVel.current = idleVel + (spinVel.current - idleVel) * Math.pow(inertiaDecay, f);
         spin.current += spinVel.current * dt;
         tilt.current.multiplyScalar(Math.pow(TILT_DECAY, f));
@@ -366,14 +389,21 @@ function LogoQuad({
     if (reducedMotion) vel.current = targetVel;
     else vel.current += (targetVel - vel.current) * 0.15;
 
-    // Resting wobble on both tilt axes, so the plate keeps reading as a solid object even
-    // when nobody is touching it — a pure Z spin is what made it look like a flat disc.
-    // Amplitude is a fraction of tiltClamp and the sum below is re-clamped, so drag plus
-    // wobble can still never approach edge-on, where a backless plate would vanish.
-    const t = reducedMotion ? 0 : state.clock.elapsedTime;
-    const wobble = reducedMotion ? 0 : maxTilt * idleTilt;
-    const idleX = Math.sin(t * IDLE_TILT_SPEED) * wobble;
-    const idleY = Math.cos(t * IDLE_TILT_SPEED * IDLE_TILT_RATIO) * wobble * 0.7;
+    // Resting wobble, as precession rather than oscillation. The plate keeps reading as a solid
+    // object even when nobody is touching it — a pure Z spin is what made it look like a flat
+    // disc — but the lean now travels around it with the turn instead of nodding on fixed axes.
+    //
+    // Amplitude is a fraction of tiltClamp and the sum below is re-clamped, so drag plus wobble
+    // can still never approach edge-on, where a backless plate would vanish.
+    const leanDepth =
+      reducedMotion
+        ? 0
+        : maxTilt *
+          idleTilt *
+          (1 - PRECESS_BREATH + PRECESS_BREATH * Math.sin(t * PRECESS_BREATH_SPEED));
+    const precess = spin.current * PRECESS_RATE + t * PRECESS_DRIFT;
+    const idleX = Math.sin(precess) * leanDepth;
+    const idleY = Math.cos(precess) * leanDepth * 0.7;
 
     // Ease the measured proximity so the plate arrives at the cursor rather than snapping.
     hover.current += (hoverTarget.current - hover.current) * Math.min(1, dt * HOVER_EASE);
