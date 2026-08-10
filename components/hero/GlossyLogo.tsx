@@ -69,17 +69,17 @@ const ALPHA_HIT = 40;
 const IDLE_VEL = 0.2;
 
 /**
- * The spec's three glass layers. The shader composites these same three for the canvas, so both
- * paths draw the same thing and the handoff is invisible.
- *
- * Only the box lives here — the layers are three children carrying the shared mask, since a
- * single element cannot hold three differently-scaled copies of itself. aspectRatio keeps the box
- * square: the mask is a square texture and a div has no intrinsic size.
+ * The rest render, placed and rotated to the spec. The canvas draws this same image, so the
+ * handoff is invisible; there is nothing to synthesise here any more because the glass is a real
+ * render rather than a stack of gradients approximating one.
  */
 const FALLBACK_STYLE: React.CSSProperties = {
   transform: "rotate(-22.35deg)",
   aspectRatio: "1 / 1",
-};export type GlossyLogoProps = {
+  background: "url(/assets/tex-glass.png) center / contain no-repeat",
+};
+
+export type GlossyLogoProps = {
   inertiaDecay?: number;
   tiltClamp?: number; // degrees
   idleSpeed?: number;
@@ -132,22 +132,23 @@ function LogoQuad({
   const maxTilt = (tiltClamp * Math.PI) / 180;
   const ready = useRef(false);
 
-  // One texture, where there were five. The rest state is this render's own alpha filled with
-  // flat cyan, so there is no second asterisk to keep in register — which is what every earlier
-  // version was fighting. The cyan plate, its normal map, the second angle frame and the matcap
-  // environment all existed to serve that reconciliation and have nothing left to do.
-  const [art] = useTexture(["/assets/tex-dollar-a.png"]);
+  // A matched pair: the same asterisk rendered as cyan glass and as the dollar-glass note. They
+  // register to IoU 0.9865 in place, so nothing here has to fit, warp or mask one onto the other
+  // — which is what the previous five textures between them existed to do.
+  const [glass, art] = useTexture(["/assets/tex-glass.png", "/assets/tex-dollar-a.png"]);
+  glass.colorSpace = THREE.SRGBColorSpace;
   art.colorSpace = THREE.SRGBColorSpace;
 
   const uniforms = useMemo(
     () => ({
+      uGlass: { value: glass },
       uArt: { value: art },
       uTime: { value: 0 },
       uReveal: { value: 0 },
       uVelocity: { value: 0 },
       uRotation: { value: new THREE.Vector2(0, 0) },
     }),
-    [art],
+    [glass, art],
   );
 
   const material = useMemo(
@@ -172,7 +173,7 @@ function LogoQuad({
   // rather than "is it near the canvas". Sampled once into a small array — reading pixels per
   // pointer move would be far too slow, and 128 is finer than the arms are thin.
   const alphaMap = useMemo(() => {
-    const img = art.image as CanvasImageSource & { width?: number };
+    const img = glass.image as CanvasImageSource & { width?: number };
     if (!img || !img.width) return null;
     const c = document.createElement("canvas");
     c.width = ALPHA_LOOKUP;
@@ -184,7 +185,7 @@ function LogoQuad({
     const out = new Uint8Array(ALPHA_LOOKUP * ALPHA_LOOKUP);
     for (let i = 0; i < out.length; i++) out[i] = px[i * 4 + 3];
     return out;
-  }, [art]);
+  }, [glass]);
 
   // uv is fixed to the plate, so this stays correct however far the logo has spun or tilted.
   // Flipped on v: GL samples bottom-up, the 2D canvas above wrote top-down.
@@ -481,13 +482,9 @@ export default function GlossyLogo(props: GlossyLogoProps) {
         // edge, which is what VIEW spans, so it stays right whichever way the box is oriented.
         <div
           aria-hidden="true"
-          className="glass-fallback pointer-events-none absolute inset-0 m-auto max-h-[79.07%] max-w-[79.07%] select-none"
+          className="pointer-events-none absolute inset-0 m-auto max-h-[79.07%] max-w-[79.07%] select-none"
           style={FALLBACK_STYLE}
-        >
-          <span className="asterisk-edge" />
-          <span className="asterisk-body" />
-          <span className="asterisk-shine" />
-        </div>
+        />
       )}
 
       {mounted && webgl && hasSize && (
