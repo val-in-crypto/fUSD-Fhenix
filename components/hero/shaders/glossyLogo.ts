@@ -49,6 +49,25 @@ export const fragmentShader = /* glsl */ `
 
   const vec4 CLEAR = vec4(0.0);
 
+  // ── the glass bevel ──────────────────────────────────────────────────────────
+  // The with-bill render's gloss lives on its chamfers: bright bands running along every edge,
+  // with a darker turn where they face away. Those follow the outline, and the outline is the
+  // mask, so they can be rebuilt from it — rather than lifted out of the render, where they are
+  // inseparable from the print. A median filter wide enough to remove the engraving's hatching
+  // leaves Franklin's tonal mass as a ghost and turns the bevels to mush; that was tried.
+  //
+  // Rebuilt this way the chamfer is in register with the shape by construction, because it *is*
+  // the shape.
+  const float BEVEL_PX = 26.0;    // chamfer width, in the spec's pixel scale
+  const float BEVEL_SLOPE = 2.4;  // how far the chamfer turns away from face-on
+  const float BEVEL_LIGHT = 0.90; // the lit band
+  const float BEVEL_DARK = 0.34;  // the turn away from the light
+  const float BEVEL_SPEC = 0.60;  // the hot line inside the lit band
+  const float BEVEL_TIGHT = 26.0; // specular exponent
+
+  // Where the key sits. Upper-left, matching the render's own.
+  const vec3 KEY = vec3(-0.55, 0.62, 0.56);
+
   // Progress along a CSS linear-gradient axis, for a 1x1 box.
   //
   // CSS measures from 0deg pointing up and runs clockwise, and its gradient line is long enough
@@ -158,10 +177,39 @@ export const fragmentShader = /* glsl */ `
     else                shine = stopMix(vec4(0.0, 0.933, 1.0, 0.28), vec4(1.0, 1.0, 1.0, 0.72), (ts - 0.84) / 0.16);
     shine.a *= 0.72;
 
+    // ── the chamfer, from the mask's own falloff ────────────────────────────────
+    // Mean alpha over a ring is a cheap stand-in for distance from the edge: about 1 well
+    // inside, about a half on the outline itself. The same taps give the inward gradient, which
+    // is the direction the chamfer turns.
+    float inner = 0.0;
+    vec2 inward = vec2(0.0);
+    for (int i = 0; i < 8; i++) {
+      float a = (float(i) + 0.5) / 8.0 * 6.2831853;
+      vec2 o = vec2(cos(a), sin(a)) * (BEVEL_PX * PX);
+      float m = maskAt(qb + o);
+      inner += m;
+      inward += o * m;
+    }
+    inner /= 8.0;
+
+    float bevel = 1.0 - smoothstep(0.45, 0.95, inner);
+    vec2 outward = length(inward) > 0.00001 ? -normalize(inward) : vec2(0.0);
+    vec3 n = normalize(vec3(outward * bevel * BEVEL_SLOPE, 1.0));
+    vec3 L = normalize(KEY);
+    float diff = max(dot(n, L), 0.0);
+    float spec = pow(max(dot(reflect(-L, n), vec3(0.0, 0.0, 1.0)), 0.0), BEVEL_TIGHT);
+
     // ── composite, over the white hero ──────────────────────────────────────────
     vec3 glass = vec3(1.0);
     glass = over(glass, vec4(edge, ae));
     glass = over(glass, vec4(body.rgb, body.a * ab));
+
+    // Chamfer under the reflection, so the sweep still reads across it.
+    float lit = bevel * ab;
+    glass = over(glass, vec4(1.0, 1.0, 1.0, lit * BEVEL_LIGHT * pow(diff, 1.6)));
+    glass = over(glass, vec4(0.02, 0.38, 0.47, lit * BEVEL_DARK * (1.0 - diff)));
+    glass += vec3(spec) * lit * BEVEL_SPEC;
+
     glass = over(glass, vec4(shine.rgb, shine.a * as));
 
     // The union is the edge, since it is the largest of the three.
