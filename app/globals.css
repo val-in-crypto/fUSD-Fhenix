@@ -291,29 +291,40 @@ body {
   }
 }
 
-/* ── Hero glass — the turn between the designer's two placements ──────────────
-   Figma gives the same layer twice at -22.35deg: 564.15x599.4 at (342.5,147.42)
-   and 573.85x587.55 at (322.75,138.92). Those give the *direction* of the move —
-   drift up-left, box wider and shorter — but not a usable amplitude. Taken
-   literally the delta is 14.9px on a 564px box, 2.6%, spread over 9 seconds:
-   0.028px per frame at 60fps. Sub-pixel. It ran correctly and looked frozen.
+/* ── Hero glass — the turning logo ────────────────────────────────────────────
+   The plate turns continuously, which is the interaction CLAUDE.md describes as
+   the signature of the build. 60s a revolution: the same luxury-watch pace the
+   shader version idled at (~63s), slow enough that it never competes with the
+   copy but unmistakably moving.
 
-   So the direction and proportion are the designer's, scaled 2.5x to something
-   the eye can actually follow: 6.6% drift, +4.3% / -5.0% on the box. Rotation
-   stays fixed at the spec's -22.35deg — the angle change comes from crossing to
-   the second render, which is a genuinely different angle, so swinging the
-   rotation as well would double-count it.
+   Starts at the spec's -22.35deg and runs a full 360 from there, so the
+   designer's resting angle is the phase the loop begins on. Linear, because an
+   eased spin reads as something being animated rather than something turning.
 
-   Transform order is deliberate. CSS applies these right to left, so scale runs
-   first in the element's own space — which is the space Figma reports width and
-   height in for a rotated layer — then the rotation, then the drift in frame
-   space. Any other order shears the plate instead of turning it.
+   The rotation lives on its own layer. One element cannot animate transform
+   twice — a second declaration replaces the first, it does not compose — so the
+   drift below is applied to a child and the two multiply out naturally. */
+@keyframes hero-glass-spin {
+  from {
+    transform: rotate(-22.35deg);
+  }
+  to {
+    transform: rotate(337.65deg);
+  }
+}
+
+/* The secondary move, from the designer's two placements: drift up-left, box
+   wider and shorter. Their literal delta is 14.9px on a 564px box — 2.6% over
+   9 seconds, 0.028px per frame — so it is direction and proportion taken from
+   them, scaled 2.5x to something the eye can follow. No rotation here: the
+   parent owns that, and the angle change also comes from crossing to the second
+   render, which is a genuinely different angle.
 
    Drift is a percentage of the element's own box, so it tracks the stage the
    same way the box does. */
 @keyframes hero-glass-turn {
   to {
-    transform: translate(-6.603%, -6.018%) rotate(-22.35deg) scale(1.043, 0.9505);
+    transform: translate(-6.603%, -6.018%) scale(1.043, 0.9505);
   }
 }
 
@@ -326,6 +337,11 @@ body {
 }
 
 .hero-glass {
+  animation: hero-glass-spin 60s linear infinite;
+  will-change: transform;
+}
+
+.hero-glass-drift {
   animation: hero-glass-turn 9s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
   will-change: transform;
 }
@@ -335,11 +351,13 @@ body {
   animation: hero-glass-cross 9s cubic-bezier(0.45, 0, 0.55, 1) infinite alternate;
 }
 
-/* CLAUDE.md is explicit that reduced motion gets no idle drift. Dropping the
-   animations leaves the element on its inline transform, which is placement A —
-   the design's resting state — so nothing has to be restated here. */
+/* CLAUDE.md is explicit that reduced motion gets no idle drift — and a plate
+   turning on its own is exactly that. Dropping the animations leaves the outer
+   element on its inline transform, which is the spec's resting -22.35deg, so
+   the resting state does not have to be restated here. */
 @media (prefers-reduced-motion: reduce) {
   .hero-glass,
+  .hero-glass-drift,
   .hero-glass-b {
     animation: none;
   }

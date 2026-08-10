@@ -144,14 +144,19 @@ export default function Hero() {
             transform: "rotate(-22.35deg)",
           }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/assets/hero-glass.png" alt="" className="absolute inset-0 h-full w-full" />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/assets/hero-glass-b.png"
-            alt=""
-            className="hero-glass-b absolute inset-0 h-full w-full"
-          />
+          {/* Two layers because one element cannot animate transform twice — the second
+              declaration would simply replace the first. The outer turns, this one carries
+              the drift and swell, and the two compose. */}
+          <div className="hero-glass-drift absolute inset-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/assets/hero-glass.png" alt="" className="absolute inset-0 h-full w-full" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/assets/hero-glass-b.png"
+              alt=""
+              className="hero-glass-b absolute inset-0 h-full w-full"
+            />
+          </div>
         </div>
 
         {/* ◐USD lockup */}
