@@ -37,6 +37,21 @@ export const fragmentShader = /* glsl */ `
 
   varying vec2 vUv;
 
+  // Back to sRGB on the way out.
+  //
+  // Both textures are flagged sRGB, so three.js converts them to linear as it samples them, and
+  // normally converts back in the material's output chunks — which a raw ShaderMaterial does not
+  // include. The post-processing pass used to do it instead; with that gone, linear values were
+  // landing in an sRGB framebuffer and the mark read dark. The interior mean #aae6ef is (0.667,
+  // 0.902, 0.937), and unconverted it displays as roughly (0.402, 0.792, 0.863).
+  //
+  // The real transfer function rather than a 2.2 gamma: the two diverge most in the darks, which
+  // is where the bevels are.
+  vec3 toSRGB(vec3 c) {
+    return mix(c * 12.92, 1.055 * pow(max(c, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055,
+               step(vec3(0.0031308), c));
+  }
+
   // Where the key light sits, in screen space (radians; 0 = right, PI/2 = up). Fixed in the
   // world — the plate turns through it, it does not travel with the plate.
   const float LIGHT_ANGLE = 2.35; // upper-left
@@ -67,6 +82,6 @@ export const fragmentShader = /* glsl */ `
     vec2 dir = vec2(cos(lightPhase), sin(lightPhase));
     col *= 1.0 + DEPTH_GRADIENT * (1.0 + DEPTH_SPIN * uVelocity) * dot(uv - 0.5, dir);
 
-    gl_FragColor = vec4(col, m.a);
+    gl_FragColor = vec4(toSRGB(col), m.a);
   }
 `;
