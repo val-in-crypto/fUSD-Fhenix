@@ -15,11 +15,22 @@ import { ArrowEnter } from "@/components/hero/icons";
  */
 const LABEL = "#122531";
 
+/** Fhenix's Mailchimp signup. Every instance of this pill points here — the hero's, the
+ *  "rebuilding value" section's and the footer's — so the destination lives in one place. */
+const WAITLIST_URL = "https://mailchi.mp/fhenix/d8otecz7tq";
+
+/** Matches Socials: a new tab, and noopener so the opened page cannot reach back through
+ *  window.opener. */
+const EXTERNAL = { target: "_blank", rel: "noopener noreferrer" } as const;
+
 export default function WaitlistPill({ className }: { className?: string }) {
   return (
-    <button
-      type="button"
-      className={`flex items-center gap-2 rounded-full bg-glow-cyan ${className ?? ""}`}
+    // An anchor, not a button: this navigates. As a button it was inert, and it also cost
+    // middle-click, cmd-click and "copy link address", which people expect of a CTA.
+    <a
+      href={WAITLIST_URL}
+      {...EXTERNAL}
+      className={`inline-flex items-center gap-2 rounded-full bg-glow-cyan ${className ?? ""}`}
       style={{
         padding: "10px 20px",
         border: "1px solid #ABFEFF",
@@ -34,6 +45,6 @@ export default function WaitlistPill({ className }: { className?: string }) {
       >
         JOIN WAITLIST
       </span>
-    </button>
+    </a>
   );
 }
