@@ -25,7 +25,18 @@ const CAPTION_STYLE = {
   lineHeight: 1.1,
 } as const;
 
-const CAPTION = "A quantum-proof stack that returns you control over your onchain data.";
+/**
+ * "Quantum-proof" carries the cyan; the rest of the line stays muted. A fragment rather than
+ * a string so both the desktop and mobile captions render the same markup from one place —
+ * the alternative is the same sentence written out twice with the span in it, and the two
+ * drifting apart. text-glow-cyan is the --glow-cyan token, not a second copy of the hex.
+ */
+const Caption = () => (
+  <>
+    A <span className="text-glow-cyan">quantum-proof</span> stack that returns you control over
+    your onchain data.
+  </>
+);
 
 export default function RebuildingValue() {
   return (
@@ -73,7 +84,7 @@ export default function RebuildingValue() {
           className="absolute font-mono uppercase text-mono-muted"
           style={{ right: 40, top: 431, width: "23.056%", ...CAPTION_STYLE }}
         >
-          {CAPTION}
+          <Caption />
         </p>
       </div>
 
@@ -101,7 +112,7 @@ export default function RebuildingValue() {
         <WaitlistPill className="self-start" />
 
         <p className="font-mono uppercase text-mono-muted" style={{ ...CAPTION_STYLE, fontSize: 13 }}>
-          {CAPTION}
+          <Caption />
         </p>
       </div>
     </section>

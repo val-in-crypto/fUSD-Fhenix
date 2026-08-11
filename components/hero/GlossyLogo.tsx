@@ -2,35 +2,40 @@
 
 import { Canvas, useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
 import { PerspectiveCamera, useTexture } from "@react-three/drei";
-import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { useReducedMotion } from "@/components/motion/MotionProvider";
 import { fragmentShader, vertexShader } from "./shaders/glossyLogo";
 
-const BASE_ROTATION = (-25.98 * Math.PI) / 180;
-const VIEW = 2.5; // world units across the smaller viewport edge (larger = smaller logo)
+// The spec's angle for this element, given for both the with-bill and without-bill states.
+// CLAUDE.md's -25.98 is the logo mark's, a different node.
+const BASE_ROTATION = (-22.35 * Math.PI) / 180;
+// World units across the smaller viewport edge, so larger = smaller logo.
+//
+// Measured against the spec's box, which is what the canvas occupies: the asterisk fills 87.6%
+// of the texture's height on a 1.7 quad, so it stands 1.489 / VIEW of the box's smaller edge.
+const VIEW = 1.93;
 // Vertical FOV. Narrow on purpose: enough foreshortening for the tilt to read as depth,
 // short of the wide-angle stretch that would fight the flat, product-shot framing.
 const FOV = 30;
 
 // physics feel — defaults; overridable via props for art direction
 const DEFAULTS = {
-  reflStrength: 0.35,
   inertiaDecay: 0.94, // per 1/60 s
   tiltClamp: 30, // degrees
   idleSpeed: 0.5,
   scrollReveal: 0.9, // ceiling of scroll's contribution to the reveal; 0 disables it
   idleTilt: 0.55, // fraction of tiltClamp used by the resting wobble; 0 = flat spin only
-  // Floor under the reveal, so the facets keep catching the dollar during the idle turn
-  // rather than only on a flick or a scroll. Drag and scroll still bloom above it.
-  restReveal: 0.6,
-  // Ceiling on the dollar-glass reveal, reached when the pointer is over the logo. It rests
-  // at plain cyan glass and fades the portrait in as the cursor approaches; 0 disables the
-  // reflection outright without touching the mask tuning.
+  // Ceiling on the note reveal, reached when the pointer is over the logo. The plate rests as
+  // plain cyan glass and fades the engraving in as the cursor arrives; 0 leaves it cyan.
   dollarReveal: 1,
   // How far the plate leans toward the cursor on approach, as a fraction of tiltClamp.
-  hoverLean: 0.5,
+  //
+  // Off. The lean tilted the plate to face the pointer, which both moved it and foreshortened
+  // it — a mark that shifts and squashes whenever the cursor passes near it. Hover still
+  // brings the portrait up; it just no longer touches the geometry. Kept as a prop rather
+  // than deleted, so the behaviour is one number away if it is ever wanted back.
+  hoverLean: 0,
 };
 const SPIN_SENS = 0.01;
 const TILT_SENS_X = 0.002;
@@ -41,10 +46,27 @@ const SCROLL_REF = 1400;
 // Per 1/60 s falloff of the scroll signal once the page stops moving. Slower than the
 // spin's inertiaDecay so the reflection lingers a beat instead of snapping off.
 const SCROLL_DECAY = 0.88;
-// Rad/s of the resting tilt wobble. The two axes run at different rates so they trace a
-// slow lissajous rather than a repeating figure-eight.
-const IDLE_TILT_SPEED = 0.42;
-const IDLE_TILT_RATIO = 0.68; // second axis rate, relative to the first
+// A slow breath on the idle spin rate. A perfectly constant rate is most of what reads as
+// machinery — a real object turning under its own momentum is never quite metronomic — and the
+// period here is deliberately unrelated to the turn's, so the two never resolve into a pattern
+// the eye can follow.
+const IDLE_BREATH = 0.18; // fraction of the idle rate
+const IDLE_BREATH_SPEED = 0.19; // rad/s
+
+// Precession, replacing the lissajous the resting wobble used to trace.
+//
+// The lissajous ran on fixed axes at a rate of its own, which is why the wobble and the turn
+// read as two mechanisms side by side rather than one object. A body spinning about an axis
+// slightly off its own does something specific instead: the lean *travels* around it as it
+// turns. Tying the lean's direction to the spin phase is what makes the two one motion.
+//
+// The rate is a fraction of the spin rather than a multiple, so the lean never returns to the
+// same place at the same point in a revolution, and a slow drift is added on top so it does not
+// close even over many turns.
+const PRECESS_RATE = 0.31; // lean direction, relative to spin phase
+const PRECESS_DRIFT = 0.11; // rad/s, so the precession never resolves against the spin
+const PRECESS_BREATH = 0.27; // how much the lean's depth varies
+const PRECESS_BREATH_SPEED = 0.13; // rad/s
 const HOVER_EASE = 6; // approach rate per second toward the measured proximity
 // Resolution of the alpha lookup built from the base texture. The hover tests this rather
 // than the quad the asterisk is drawn on: the quad is square and the asterisk does not fill
@@ -57,16 +79,23 @@ const ALPHA_HIT = 40;
 // a full turn in ~63s (luxury-watch pace).
 const IDLE_VEL = 0.2;
 
-const FALLBACK_STYLE: React.CSSProperties = { transform: "rotate(-25.98deg)", opacity: 0.7 };
+/**
+ * The rest render, placed and rotated to the spec. The canvas draws this same image, so the
+ * handoff is invisible; there is nothing to synthesise here any more because the glass is a real
+ * render rather than a stack of gradients approximating one.
+ */
+const FALLBACK_STYLE: React.CSSProperties = {
+  transform: "rotate(-22.35deg)",
+  aspectRatio: "1 / 1",
+  background: "url(/assets/tex-glass.png) center / contain no-repeat",
+};
 
 export type GlossyLogoProps = {
-  reflStrength?: number;
   inertiaDecay?: number;
   tiltClamp?: number; // degrees
   idleSpeed?: number;
   scrollReveal?: number;
   idleTilt?: number;
-  restReveal?: number;
   dollarReveal?: number;
   hoverLean?: number;
 };
@@ -99,13 +128,11 @@ function FitCamera() {
 }
 
 function LogoQuad({
-  reflStrength,
   inertiaDecay,
   tiltClamp,
   idleSpeed,
   scrollReveal,
   idleTilt,
-  restReveal,
   dollarReveal,
   hoverLean,
   reducedMotion,
@@ -116,36 +143,24 @@ function LogoQuad({
   const maxTilt = (tiltClamp * Math.PI) / 180;
   const ready = useRef(false);
 
-  const [base, normal, bill, env] = useTexture([
-    "/assets/tex-base.png",
-    "/assets/tex-normal.png",
-    "/assets/bill-100.png",
-    "/assets/dollar.png",
-  ]);
-  base.colorSpace = THREE.SRGBColorSpace;
-  bill.colorSpace = THREE.SRGBColorSpace;
-  env.colorSpace = THREE.SRGBColorSpace;
-  normal.colorSpace = THREE.NoColorSpace;
-  env.wrapS = env.wrapT = THREE.RepeatWrapping;
-  // uBill needs no wrap mode: the fragment shader clamps its UV, so parallax runs off the
-  // edge of the print instead of wrapping a second Franklin into view.
+  // A matched pair: the same asterisk rendered as cyan glass and as the dollar-glass note. They
+  // register to IoU 0.9865 in place, so nothing here has to fit, warp or mask one onto the other
+  // — which is what the previous five textures between them existed to do.
+  const [glass, art] = useTexture(["/assets/tex-glass.png", "/assets/tex-dollar-a.png"]);
+  glass.colorSpace = THREE.SRGBColorSpace;
+  art.colorSpace = THREE.SRGBColorSpace;
 
   const uniforms = useMemo(
     () => ({
-      uBase: { value: base },
-      uNormal: { value: normal },
-      uBill: { value: bill },
-      uEnv: { value: env },
+      uGlass: { value: glass },
+      uArt: { value: art },
       uTime: { value: 0 },
       uReveal: { value: 0 },
-      uDollarMix: { value: dollarReveal },
-      uReflStrength: { value: reflStrength },
       uVelocity: { value: 0 },
       uRotation: { value: new THREE.Vector2(0, 0) },
     }),
-    [base, normal, bill, env], // eslint-disable-line react-hooks/exhaustive-deps
+    [glass, art],
   );
-  uniforms.uReflStrength.value = reflStrength;
 
   const material = useMemo(
     () => new THREE.ShaderMaterial({ vertexShader, fragmentShader, uniforms, transparent: true }),
@@ -155,7 +170,6 @@ function LogoQuad({
   const spin = useRef(0);
   const spinVel = useRef(0);
   const tilt = useRef(new THREE.Vector2(0, 0));
-  const reveal = useRef(0);
   const vel = useRef(0);
   const dragging = useRef(false);
   const idleDir = useRef(1); // sign of the resting idle spin — follows the last flick
@@ -170,7 +184,7 @@ function LogoQuad({
   // rather than "is it near the canvas". Sampled once into a small array — reading pixels per
   // pointer move would be far too slow, and 128 is finer than the arms are thin.
   const alphaMap = useMemo(() => {
-    const img = base.image as CanvasImageSource & { width?: number };
+    const img = glass.image as CanvasImageSource & { width?: number };
     if (!img || !img.width) return null;
     const c = document.createElement("canvas");
     c.width = ALPHA_LOOKUP;
@@ -182,7 +196,7 @@ function LogoQuad({
     const out = new Uint8Array(ALPHA_LOOKUP * ALPHA_LOOKUP);
     for (let i = 0; i < out.length; i++) out[i] = px[i * 4 + 3];
     return out;
-  }, [base]);
+  }, [glass]);
 
   // uv is fixed to the plate, so this stays correct however far the logo has spun or tilted.
   // Flipped on v: GL samples bottom-up, the 2D canvas above wrote top-down.
@@ -264,6 +278,18 @@ function LogoQuad({
     el.style.touchAction = "none";
 
     const onMove = (e: PointerEvent) => {
+      // Backstop for the reveal. R3F only knows the pointer left the plate if the canvas is
+      // still receiving events, so a cursor that exits the window, or a page that scrolls the
+      // canvas out from under a cursor that has not moved, can leave the note showing with
+      // nothing hovering it. This is window-level and rect-based, so neither case sticks.
+      const r = canvasRect.current;
+      if (r) {
+        const inside =
+          e.clientX >= r.left && e.clientX <= r.right &&
+          e.clientY >= r.top && e.clientY <= r.bottom;
+        if (!inside) hoverTarget.current = 0;
+      }
+
       if (!dragging.current) return;
       const now = performance.now();
       const dt = Math.max(16, now - last.current.t) / 1000;
@@ -288,11 +314,20 @@ function LogoQuad({
       } catch {}
     };
 
+    // Leaving the document entirely fires neither a move nor an out on the canvas.
+    const onLeave = () => {
+      hoverTarget.current = 0;
+    };
+
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
+    document.addEventListener("pointerleave", onLeave);
+    window.addEventListener("blur", onLeave);
     return () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      document.removeEventListener("pointerleave", onLeave);
+      window.removeEventListener("blur", onLeave);
     };
   }, [gl, reducedMotion]);
 
@@ -312,6 +347,8 @@ function LogoQuad({
     const dt = Math.min(delta, 0.05);
     const f = dt * 60;
 
+    const t = reducedMotion ? 0 : state.clock.elapsedTime;
+
     if (!dragging.current) {
       if (reducedMotion) {
         spinVel.current = 0;
@@ -320,7 +357,11 @@ function LogoQuad({
         // the last-flicked direction. A flick blooms, then decays gently back to idle — no
         // snap, no overshoot. In-plane (Z) spin only: the asterisk is a flat plate, so a
         // Y-axis turn would send it edge-on and vanish (CLAUDE.md hard constraint).
-        const idleVel = idleSpeed * IDLE_VEL * idleDir.current;
+        const idleVel =
+          idleSpeed *
+          IDLE_VEL *
+          idleDir.current *
+          (1 + IDLE_BREATH * Math.sin(t * IDLE_BREATH_SPEED));
         spinVel.current = idleVel + (spinVel.current - idleVel) * Math.pow(inertiaDecay, f);
         spin.current += spinVel.current * dt;
         tilt.current.multiplyScalar(Math.pow(TILT_DECAY, f));
@@ -342,28 +383,26 @@ function LogoQuad({
     if (!reducedMotion) scrollEnergy.current *= Math.pow(SCROLL_DECAY, f);
     const scrollDrive = reducedMotion ? 0 : scrollEnergy.current * scrollReveal;
 
-    // restReveal is the floor: the idle turn is only ~0.1 rad/s, so speed alone leaves the
-    // reveal near zero and the facets have nothing to catch. Holding it at rest keeps the
-    // reflection live through the whole rotation; drag and scroll bloom above it.
     const speed = Math.abs(spinVel.current);
-    const targetReveal = Math.min(1, Math.max(restReveal, speed * 0.4, scrollDrive));
     const targetVel = Math.min(1, Math.max(speed * 0.5, scrollDrive));
-    if (reducedMotion) {
-      vel.current = targetVel;
-      reveal.current = targetReveal;
-    } else {
-      vel.current += (targetVel - vel.current) * 0.15;
-      reveal.current += (targetReveal - reveal.current) * Math.min(1, dt * 5);
-    }
+    if (reducedMotion) vel.current = targetVel;
+    else vel.current += (targetVel - vel.current) * 0.15;
 
-    // Resting wobble on both tilt axes, so the plate keeps reading as a solid object even
-    // when nobody is touching it — a pure Z spin is what made it look like a flat disc.
-    // Amplitude is a fraction of tiltClamp and the sum below is re-clamped, so drag plus
-    // wobble can still never approach edge-on, where a backless plate would vanish.
-    const t = reducedMotion ? 0 : state.clock.elapsedTime;
-    const wobble = reducedMotion ? 0 : maxTilt * idleTilt;
-    const idleX = Math.sin(t * IDLE_TILT_SPEED) * wobble;
-    const idleY = Math.cos(t * IDLE_TILT_SPEED * IDLE_TILT_RATIO) * wobble * 0.7;
+    // Resting wobble, as precession rather than oscillation. The plate keeps reading as a solid
+    // object even when nobody is touching it — a pure Z spin is what made it look like a flat
+    // disc — but the lean now travels around it with the turn instead of nodding on fixed axes.
+    //
+    // Amplitude is a fraction of tiltClamp and the sum below is re-clamped, so drag plus wobble
+    // can still never approach edge-on, where a backless plate would vanish.
+    const leanDepth =
+      reducedMotion
+        ? 0
+        : maxTilt *
+          idleTilt *
+          (1 - PRECESS_BREATH + PRECESS_BREATH * Math.sin(t * PRECESS_BREATH_SPEED));
+    const precess = spin.current * PRECESS_RATE + t * PRECESS_DRIFT;
+    const idleX = Math.sin(precess) * leanDepth;
+    const idleY = Math.cos(precess) * leanDepth * 0.7;
 
     // Ease the measured proximity so the plate arrives at the cursor rather than snapping.
     hover.current += (hoverTarget.current - hover.current) * Math.min(1, dt * HOVER_EASE);
@@ -382,14 +421,10 @@ function LogoQuad({
       meshRef.current.rotation.set(tiltX, tiltY, BASE_ROTATION + spin.current);
     }
     uniforms.uRotation.value.set(spin.current + tilt.current.x, tilt.current.y);
-    uniforms.uReveal.value = reveal.current;
-    // How far the user has actually turned the plate off-axis, 0..1. Read off the drag tilt
-    // alone, not the composed tiltX/tiltY: those carry the idle wobble, which never stops,
-    // so the note would sit permanently half-revealed instead of answering the turn.
-    const turn = Math.min(1, Math.hypot(tilt.current.x, tilt.current.y) / maxTilt);
-    // Proximity or turn gates the portrait, whichever is stronger: plain cyan glass at rest,
-    // the note surfacing as the cursor nears or as the plate is turned to its side.
-    uniforms.uDollarMix.value = dollarReveal * Math.max(hover.current, turn);
+
+    // Hover alone. Turn used to count toward this, which meant spinning the plate brought the
+    // note up on its own; the note is the answer to the pointer and to nothing else now.
+    uniforms.uReveal.value = dollarReveal * hover.current;
     uniforms.uVelocity.value = vel.current;
     uniforms.uTime.value = reducedMotion ? 0 : state.clock.elapsedTime;
 
@@ -462,12 +497,16 @@ export default function GlossyLogo(props: GlossyLogoProps) {
           Hidden once the canvas paints its first frame so it can't ghost behind rotation.
           The accessible name lives on the wrapper, so it survives this being removed. */}
       {!painted && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src="/assets/asterisk.png"
-          alt=""
+        // The spec's own construction: the render's alpha as a mask over a flat fill. Same two
+        // things the shader does at rest, so the handoff to the canvas is invisible, and the
+        // no-WebGL path is the designer's markup rather than an approximation of it.
+        //
+        // 79.07% is the quad's share of the frame — 1.7 world units against a VIEW of 2.15.
+        // Capping both axes rather than setting a width makes that a share of the *smaller*
+        // edge, which is what VIEW spans, so it stays right whichever way the box is oriented.
+        <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 m-auto h-auto w-[75%] max-w-none select-none"
+          className="pointer-events-none absolute inset-0 m-auto max-h-[79.07%] max-w-[79.07%] select-none"
           style={FALLBACK_STYLE}
         />
       )}
@@ -484,23 +523,16 @@ export default function GlossyLogo(props: GlossyLogoProps) {
           <PerspectiveCamera makeDefault fov={FOV} position={[0, 0, 5]} />
           <FitCamera />
           <LogoQuad
-            reflStrength={settings.reflStrength}
             inertiaDecay={settings.inertiaDecay}
             tiltClamp={settings.tiltClamp}
             idleSpeed={settings.idleSpeed}
             scrollReveal={settings.scrollReveal}
             idleTilt={settings.idleTilt}
-            restReveal={settings.restReveal}
             dollarReveal={settings.dollarReveal}
             hoverLean={settings.hoverLean}
             reducedMotion={reduced}
             onReady={() => setPainted(true)}
           />
-          {!reduced && (
-            <EffectComposer>
-              <Bloom intensity={0.4} luminanceThreshold={0.72} luminanceSmoothing={0.15} mipmapBlur />
-            </EffectComposer>
-          )}
         </Canvas>
       )}
     </div>

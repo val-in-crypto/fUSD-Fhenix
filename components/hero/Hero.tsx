@@ -121,12 +121,21 @@ export default function Hero() {
           style={{ right: 40, top: "calc(50% - 3px)" }}
         />
 
-        {/* Interactive glossy logo */}
+        {/* Interactive glossy logo. The box is the spec's 564.15 x 599.4, kept as fractions so
+            it tracks the stage, and now centred on it rather than at the spec's offsets.
+
+            Centred means centred: the box's middle is the stage's, and the mark's middle is the
+            box's, because tex-glass.png is framed with its asterisk at 98px left and right, 63
+            and 64 top and bottom of 1024. So the mark lands on the stage's centre to within a
+            pixel — and on the axis between the two hairlines at 377 and 1062, whose midpoint is
+            719.5 against a stage centre of 720.
+
+            Measured clear at 1440: the mark spans 519-921 across, against the mono labels at
+            211-353 and 1087-1247, and 294-729 down, against a headline ending at 241. The
+            -22.35deg is still the spec's and lives on the mesh. */}
         <div
           className="absolute"
-          // Width as a fraction of the stage (1082/1440), not frozen px: below the 1440
-          // design width a fixed 1082 runs past the right edge — 119px of it at 1100.
-          style={{ left: "calc(8.33% + 45px)", top: "7.324%", width: "75.139%", height: "95.703%" }}
+          style={{ left: "30.4115%", top: "20.7325%", width: "39.177%", height: "58.535%" }}
         >
           <GlossyLogo />
         </div>
@@ -220,7 +229,7 @@ export default function Hero() {
           style={{ left: "calc(75% + 7px)", top: "68.359%", height: 42 }}
         >
           <p
-            className="font-serif whitespace-nowrap text-glow-cyan"
+            className="font-serif uppercase whitespace-nowrap text-glow-cyan"
             style={{ fontSize: "clamp(18px, 2.2vw, 32px)", letterSpacing: "-0.32px", lineHeight: 0.9 }}
           >
             Live on Arbitrum soon
@@ -282,7 +291,7 @@ export default function Hero() {
             come to ~344px against 327px of content width at 375px — so it takes its own
             right-aligned line directly above, which keeps it reading as the CTA's pair. */}
         <p
-          className="relative mt-6 text-right font-serif text-glow-cyan"
+          className="relative mt-6 text-right font-serif uppercase text-glow-cyan"
           style={{ fontSize: 20, letterSpacing: "-0.2px", lineHeight: 0.9 }}
         >
           Live on Arbitrum soon
