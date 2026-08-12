@@ -40,7 +40,7 @@ const CARDS: CompareCard[] = [
 function CompareCard({ card, absolute }: { card: CompareCard; absolute?: boolean }) {
   return (
     <div
-      className="compare-card relative overflow-hidden rounded-[24px] bg-white/10"
+      className="compare-card relative h-full overflow-hidden rounded-[24px] bg-white/10"
       style={{
         height: absolute ? 294 : undefined,
         minHeight: absolute ? undefined : 260,
@@ -186,9 +186,14 @@ export default function DualMode() {
           aria-hidden="true"
           className="h-auto w-[150px] select-none"
         />
-        <div className="flex flex-col gap-5">
+        {/* A grid with equal rows, not a flex column.
+            Stacked, each card sized to its own content, and the two do not hold the same
+            amount: the second has a heading that wraps to two lines and a longer body, so it
+            ran 365px against 325px at 320px wide. auto-rows-fr makes every row the height of
+            the tallest, and the card fills its row. */}
+        <div className="grid auto-rows-fr gap-5">
           {CARDS.map((c, i) => (
-            <Reveal key={c.title} delay={MOTION.stagger * (i + 1)}>
+            <Reveal key={c.title} delay={MOTION.stagger * (i + 1)} className="h-full">
               <CompareCard card={c} />
             </Reveal>
           ))}
