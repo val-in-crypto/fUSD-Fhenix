@@ -24,12 +24,26 @@ const LIVE_TEXT_STYLE = {
 } as const;
 
 /**
- * Drop needed to sit the glyphs on the bottom edge. Setting bottom to 0 only flushes the
- * element's box; the ink still stops 19.3px short at 96px, because the line box reserves
- * half-leading plus the font's 30px descent metric — and this line is uppercase, so it has
- * no descenders to spend it on. In em rather than px so it stays correct if the size changes.
+ * Offset that sits the line's lowest ink on the bottom edge.
+ *
+ * This was -0.201em while the copy read "…SOON". Setting bottom to 0 only flushes the element's
+ * box; the ink stopped 19.3px short at 96px, because the line box reserves half-leading plus the
+ * font's 30px descent metric, and an all-caps line with no descenders has nothing to spend it on.
+ * The drop took up that slack.
+ *
+ * "…IN Q4" has a descender. Measured at 96px, the old string's ink descends 0.96px below the
+ * baseline and this one's descends 20.64px — the Q's tail. So the drop that used to land the
+ * baseline on the edge now pushes the tail 19.68px past it, and the footer clips, which shears
+ * the Q into what reads as a 0.
+ *
+ * The edge can carry the baseline or the tail, not both, so this now carries the tail: 0.205em
+ * of descent against 0.201em of slack leaves 0.004em to lift. The practical effect is that the
+ * baseline sits about a fifth of an em higher than it did, with the Q's tail on the edge in its
+ * place.
+ *
+ * Kept in em so it holds at the clamped sizes below.
  */
-const LIVE_BASELINE_DROP = "-0.201em";
+const LIVE_BASELINE_DROP = "0.004em";
 
 /**
  * Size, for both breakpoints. The line cannot wrap, so it has to be sized to the space rather
@@ -37,11 +51,16 @@ const LIVE_BASELINE_DROP = "-0.201em";
  * under ~870px wide. The footer clips, so it did not scroll the page — it simply cut the ends
  * off the line, and at 320 the last word was gone entirely.
  *
- * Measured, not guessed: this string sets 8.77x its font-size wide in Instrument Serif, so
+ * Measured, not guessed: this string sets 8.64x its font-size wide in Instrument Serif, so
  * dividing the available width by that ratio fits it exactly. Holds the design's 96px wherever
- * there is room, which is every viewport from ~870px up.
+ * there is room, which is every viewport from ~860px up.
+ *
+ * Remeasure this whenever the copy changes — it is a property of the string. The glyphs alone
+ * run 8.852x, and the -0.01em tracking takes 0.01 off per character, so 22 characters bring it
+ * to 8.632; 8.64 leaves a hair of margin. The previous 8.77 was the same arithmetic for
+ * "…SOON", which is a character shorter and wider per em.
  */
-const LIVE_SIZE = "min(calc((100vw - 48px) / 8.77), 96px)";
+const LIVE_SIZE = "min(calc((100vw - 48px) / 8.64), 96px)";
 
 export default function SiteFooter() {
   return (
