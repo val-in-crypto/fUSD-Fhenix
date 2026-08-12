@@ -215,13 +215,13 @@ export default function Hero() {
           INTO STABLE VALUE
         </p>
 
-        {/* CTA. Figma puts it at y=820; it was raised to 700 to clear the fold on shorter
-            viewports, and now sits at 760 — back toward the spec without giving that up. At the
-            shortest stage this hero is built for it still lands well inside: 74.219% of a 700px
-            viewport is 519, and the pill is 42 tall.
+        {/* CTA, at the spec's own y=820. It had been raised to 700 to clear the fold on shorter
+            viewports; that still holds at the shortest stage this hero is built for — 80.078% of
+            a 700px viewport is 561, and the pill is 42 tall, so it lands at 561-603 against a
+            700px fold with the socials at 640-664 below it.
 
-            760 also drops it clear of the mark, which ends at 730. */}
-        <div className="absolute" style={{ left: 40, top: "74.219%" }}>
+            Also clear of the mark, which ends at 730. */}
+        <div className="absolute" style={{ left: 40, top: "80.078%" }}>
           <WaitlistPill />
         </div>
 
@@ -231,7 +231,7 @@ export default function Hero() {
             because the right column is only ~180px wide at the md breakpoint. */}
         <div
           className="absolute flex items-center"
-          style={{ left: "calc(75% + 7px)", top: "74.219%", height: 42 }}
+          style={{ left: "calc(75% + 7px)", top: "80.078%", height: 42 }}
         >
           <p
             className="font-serif uppercase whitespace-nowrap text-glow-cyan"
