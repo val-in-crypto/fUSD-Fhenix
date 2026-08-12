@@ -286,23 +286,27 @@ export default function Hero() {
           </div>
         </div>
 
+        {/* Status line, between the intro copy and the mark rather than above the CTA.
+            It used to sit on its own line just above the CTA, right-aligned, reading as the
+            CTA's pair — it cannot share the CTA's row, since pill, line and socials come to
+            ~344px against 327px of content width at 375px.
+
+            Left-aligned here because it now sits in a left-aligned column under the eyebrow;
+            kept right-aligned it would be stranded mid-stack with nothing to align to. */}
+        <p
+          className="relative mt-5 font-serif uppercase text-glow-cyan"
+          style={{ fontSize: 20, letterSpacing: "-0.2px", lineHeight: 0.9 }}
+        >
+          Live on Arbitrum in Q4
+        </p>
+
         {/* min-h-0 is load-bearing: a flex item's default min-height:auto would let the
             canvas's intrinsic size win and push the CTA back off the screen. */}
         <div className="relative mx-auto mt-4 w-full max-w-[380px] flex-1 min-h-0">
           <GlossyLogo />
         </div>
 
-        {/* Same status line. It cannot share the CTA's row here — pill, line and socials
-            come to ~344px against 327px of content width at 375px — so it takes its own
-            right-aligned line directly above, which keeps it reading as the CTA's pair. */}
-        <p
-          className="relative mt-6 text-right font-serif uppercase text-glow-cyan"
-          style={{ fontSize: 20, letterSpacing: "-0.2px", lineHeight: 0.9 }}
-        >
-          Live on Arbitrum in Q4
-        </p>
-
-        <div className="relative mt-3 flex items-center justify-between">
+        <div className="relative mt-6 flex items-center justify-between">
           <WaitlistPill />
           <Socials />
         </div>
