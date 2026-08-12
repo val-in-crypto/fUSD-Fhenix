@@ -72,7 +72,7 @@ export default function SiteFooter() {
               absolutely-positioned box and the line only covers about two thirds of it —
               on the <p> the hover would fire from its empty margins too. */}
           <span className="live-headline" style={LIVE_TEXT_STYLE}>
-            Live on Arbitrum soon
+            Live on Arbitrum in Q4
           </span>
         </p>
       </div>
@@ -95,7 +95,7 @@ export default function SiteFooter() {
           }}
         >
           <span className="live-headline" style={LIVE_TEXT_STYLE}>
-            Live on Arbitrum soon
+            Live on Arbitrum in Q4
           </span>
         </p>
       </div>

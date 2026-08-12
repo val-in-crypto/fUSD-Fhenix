@@ -54,7 +54,7 @@ function Glows({ variant = "desktop" }: { variant?: "desktop" | "mobile" }) {
           glow-top was a 1568px-wide ellipse spanning -426 to 1142px of a 1280px stage: it
           washed the full width and ran past both edges regardless of how this wash was
           tuned. glow-bottom was centred at (1039, 444), which put it directly over the
-          "Live on Arbitrum soon" line.
+          "Live on Arbitrum in Q4" line.
           Wide and shallow, so it spans the headline without reaching down into the asterisk.
           The two genuinely overlap — the art runs 458-927px across and the headline 40-604px
           — but only above y=213, where the headline ends and the art has barely begun (its
@@ -237,7 +237,7 @@ export default function Hero() {
             className="font-serif uppercase whitespace-nowrap text-glow-cyan"
             style={{ fontSize: "clamp(18px, 2.2vw, 32px)", letterSpacing: "-0.32px", lineHeight: 0.9 }}
           >
-            Live on Arbitrum soon
+            Live on Arbitrum in Q4
           </p>
         </div>
 
@@ -299,7 +299,7 @@ export default function Hero() {
           className="relative mt-6 text-right font-serif uppercase text-glow-cyan"
           style={{ fontSize: 20, letterSpacing: "-0.2px", lineHeight: 0.9 }}
         >
-          Live on Arbitrum soon
+          Live on Arbitrum in Q4
         </p>
 
         <div className="relative mt-3 flex items-center justify-between">
