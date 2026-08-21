@@ -97,6 +97,20 @@ function Logo({ className }: { className?: string }) {
 export default function Hero() {
   return (
     <section aria-label="fUSD hero" className="relative w-full overflow-hidden bg-[color:var(--bg)]">
+      {/* The wash paints on the section, which is full width, not on the stage, which caps at
+          1440 and centres. Inside the stage it stopped dead at that cap: at 1800 the hero showed
+          180px of bare white down each side, with a hard vertical edge where the gradient ended.
+
+          Nothing changes at or below 1440 — there the stage is the section's full width, so the
+          gradient resolves against the same box it always did. Above it the wash simply keeps
+          going, growing with the viewport rather than leaving the surplus unpainted.
+
+          First child, so it paints under the stage that follows. Desktop only: the phone stack
+          carries its own wash, with geometry of its own. */}
+      <div className="pointer-events-none absolute inset-0 hidden md:block">
+        <Glows />
+      </div>
+
       {/* ── Desktop / fluid stage (>= md) — exact Figma 94:3 anchors ───────────
           Stage height tracks the viewport so the hero never runs into the section
           below, and caps at the Figma stage height so it does not stretch on tall
@@ -105,8 +119,6 @@ export default function Hero() {
           they follow the stage. dvh, not vh, so mobile browser chrome collapsing
           does not leave the fold mid-composition. */}
       <div className="relative mx-auto hidden h-[min(100dvh,1024px)] w-full max-w-[1440px] md:block">
-        <Glows />
-
         <div className="absolute top-0 h-full w-px bg-hairline" style={{ left: "calc(25% + 17px)" }} />
         <div className="absolute top-0 h-full w-px bg-hairline" style={{ left: "calc(75% - 18px)" }} />
 
