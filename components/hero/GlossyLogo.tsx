@@ -13,8 +13,14 @@ const BASE_ROTATION = (-22.35 * Math.PI) / 180;
 // World units across the smaller viewport edge, so larger = smaller logo.
 //
 // Measured against the spec's box, which is what the canvas occupies: the asterisk fills 87.6%
-// of the texture's height on a 1.7 quad, so it stands 1.489 / VIEW of the box's smaller edge.
-const VIEW = 1.93;
+// of the texture's height on a 1.7 quad, so it stands 1.489 / VIEW of the box's smaller edge —
+// 840 / VIEW px at 1440, where that box is 564.15 across.
+//
+// The headline is what limits this. With the mark centred on the stage it grows symmetrically,
+// so its top climbs toward the headline's 241 twice as fast as VIEW falls: 1.72 leaves 27px of
+// air, 1.60 leaves 8, and 1.52 collides. The mono labels are the horizontal limit and are far
+// less tight — 141px of room at 1.72.
+const VIEW = 1.72;
 // Vertical FOV. Narrow on purpose: enough foreshortening for the tilt to read as depth,
 // short of the wide-angle stretch that would fight the flat, product-shot framing.
 const FOV = 30;
