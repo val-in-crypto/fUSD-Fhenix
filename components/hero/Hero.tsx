@@ -124,18 +124,21 @@ export default function Hero() {
         {/* Interactive glossy logo. The box is the spec's 564.15 x 599.4, kept as fractions so
             it tracks the stage, and now centred on it rather than at the spec's offsets.
 
-            Centred means centred: the box's middle is the stage's, and the mark's middle is the
-            box's, because tex-glass.png is framed with its asterisk at 98px left and right, 63
-            and 64 top and bottom of 1024. So the mark lands on the stage's centre to within a
-            pixel — and on the axis between the two hairlines at 377 and 1062, whose midpoint is
-            719.5 against a stage centre of 720.
+            Centred horizontally, and a little below centre vertically: the box's middle sits at
+            50% / 53%. The mark's middle is the box's, because tex-glass.png is framed with its
+            asterisk at 98px left and right, 63 and 64 top and bottom of 1024 — so it lands on
+            the hairline axis (377 and 1062, midpoint 719.5 against a stage centre of 720) and
+            three per cent below the vertical middle.
 
-            Measured clear at 1440: the mark spans 519-921 across, against the mono labels at
-            211-353 and 1087-1247, and 294-729 down, against a headline ending at 241. The
-            -22.35deg is still the spec's and lives on the mesh. */}
+            The drop is what lets the mark be as large as it is. It grows symmetrically about
+            this centre, so every pixel of growth costs two at the top; moving the centre down
+            hands that back. Measured clear at 1440: the mark spans 478-963 across against mono
+            labels at 211-353 and 1087-1247, and 280-805 down against a headline ending at 241.
+
+            The -22.35deg is still the spec's and lives on the mesh. */}
         <div
           className="absolute"
-          style={{ left: "30.4115%", top: "20.7325%", width: "39.177%", height: "58.535%" }}
+          style={{ left: "30.4115%", top: "23.7325%", width: "39.177%", height: "58.535%" }}
         >
           <GlossyLogo />
         </div>

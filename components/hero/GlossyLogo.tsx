@@ -16,11 +16,14 @@ const BASE_ROTATION = (-22.35 * Math.PI) / 180;
 // of the texture's height on a 1.7 quad, so it stands 1.489 / VIEW of the box's smaller edge —
 // 840 / VIEW px at 1440, where that box is 564.15 across.
 //
-// The headline is what limits this. With the mark centred on the stage it grows symmetrically,
-// so its top climbs toward the headline's 241 twice as fast as VIEW falls: 1.72 leaves 27px of
-// air, 1.60 leaves 8, and 1.52 collides. The mono labels are the horizontal limit and are far
-// less tight — 141px of room at 1.72.
-const VIEW = 1.72;
+// The headline is what limits this. The mark grows symmetrically about its box centre, so its
+// top climbs toward the headline's 241 twice as fast as VIEW falls — which is why the box was
+// dropped below the stage centre at the same time as this fell. Together they buy air rather
+// than spend it: 1.72 centred left 27px under the headline, 1.60 at 53% leaves 39.
+//
+// The mono labels are the horizontal limit and are far less tight: 124px of room here, with the
+// mark spanning 478-963 against labels ending at 353 and starting at 1087.
+const VIEW = 1.60;
 // Vertical FOV. Narrow on purpose: enough foreshortening for the tilt to read as depth,
 // short of the wide-angle stretch that would fight the flat, product-shot framing.
 const FOV = 30;
