@@ -54,7 +54,7 @@ function Glows({ variant = "desktop" }: { variant?: "desktop" | "mobile" }) {
           glow-top was a 1568px-wide ellipse spanning -426 to 1142px of a 1280px stage: it
           washed the full width and ran past both edges regardless of how this wash was
           tuned. glow-bottom was centred at (1039, 444), which put it directly over the
-          "Live on Arbitrum soon" line.
+          "Live on Arbitrum in Q4" line.
           Wide and shallow, so it spans the headline without reaching down into the asterisk.
           The two genuinely overlap — the art runs 458-927px across and the headline 40-604px
           — but only above y=213, where the headline ends and the art has barely begun (its
@@ -97,6 +97,20 @@ function Logo({ className }: { className?: string }) {
 export default function Hero() {
   return (
     <section aria-label="fUSD hero" className="relative w-full overflow-hidden bg-[color:var(--bg)]">
+      {/* The wash paints on the section, which is full width, not on the stage, which caps at
+          1440 and centres. Inside the stage it stopped dead at that cap: at 1800 the hero showed
+          180px of bare white down each side, with a hard vertical edge where the gradient ended.
+
+          Nothing changes at or below 1440 — there the stage is the section's full width, so the
+          gradient resolves against the same box it always did. Above it the wash simply keeps
+          going, growing with the viewport rather than leaving the surplus unpainted.
+
+          First child, so it paints under the stage that follows. Desktop only: the phone stack
+          carries its own wash, with geometry of its own. */}
+      <div className="pointer-events-none absolute inset-0 hidden md:block">
+        <Glows />
+      </div>
+
       {/* ── Desktop / fluid stage (>= md) — exact Figma 94:3 anchors ───────────
           Stage height tracks the viewport so the hero never runs into the section
           below, and caps at the Figma stage height so it does not stretch on tall
@@ -105,8 +119,6 @@ export default function Hero() {
           they follow the stage. dvh, not vh, so mobile browser chrome collapsing
           does not leave the fold mid-composition. */}
       <div className="relative mx-auto hidden h-[min(100dvh,1024px)] w-full max-w-[1440px] md:block">
-        <Glows />
-
         <div className="absolute top-0 h-full w-px bg-hairline" style={{ left: "calc(25% + 17px)" }} />
         <div className="absolute top-0 h-full w-px bg-hairline" style={{ left: "calc(75% - 18px)" }} />
 
@@ -124,18 +136,21 @@ export default function Hero() {
         {/* Interactive glossy logo. The box is the spec's 564.15 x 599.4, kept as fractions so
             it tracks the stage, and now centred on it rather than at the spec's offsets.
 
-            Centred means centred: the box's middle is the stage's, and the mark's middle is the
-            box's, because tex-glass.png is framed with its asterisk at 98px left and right, 63
-            and 64 top and bottom of 1024. So the mark lands on the stage's centre to within a
-            pixel — and on the axis between the two hairlines at 377 and 1062, whose midpoint is
-            719.5 against a stage centre of 720.
+            Centred horizontally, and a little below centre vertically: the box's middle sits at
+            50% / 53%. The mark's middle is the box's, because tex-glass.png is framed with its
+            asterisk at 98px left and right, 63 and 64 top and bottom of 1024 — so it lands on
+            the hairline axis (377 and 1062, midpoint 719.5 against a stage centre of 720) and
+            three per cent below the vertical middle.
 
-            Measured clear at 1440: the mark spans 519-921 across, against the mono labels at
-            211-353 and 1087-1247, and 294-729 down, against a headline ending at 241. The
-            -22.35deg is still the spec's and lives on the mesh. */}
+            The drop is what lets the mark be as large as it is. It grows symmetrically about
+            this centre, so every pixel of growth costs two at the top; moving the centre down
+            hands that back. Measured clear at 1440: the mark spans 478-963 across against mono
+            labels at 211-353 and 1087-1247, and 280-805 down against a headline ending at 241.
+
+            The -22.35deg is still the spec's and lives on the mesh. */}
         <div
           className="absolute"
-          style={{ left: "30.4115%", top: "20.7325%", width: "39.177%", height: "58.535%" }}
+          style={{ left: "30.4115%", top: "23.7325%", width: "39.177%", height: "58.535%" }}
         >
           <GlossyLogo />
         </div>
@@ -215,8 +230,13 @@ export default function Hero() {
           INTO STABLE VALUE
         </p>
 
-        {/* CTA — raised from Figma's y=820 to y=700 so it clears the fold on shorter viewports */}
-        <div className="absolute" style={{ left: 40, top: "68.359%" }}>
+        {/* CTA, at the spec's own y=820. It had been raised to 700 to clear the fold on shorter
+            viewports; that still holds at the shortest stage this hero is built for — 80.078% of
+            a 700px viewport is 561, and the pill is 42 tall, so it lands at 561-603 against a
+            700px fold with the socials at 640-664 below it.
+
+            Also clear of the mark, which ends at 730. */}
+        <div className="absolute" style={{ left: 40, top: "80.078%" }}>
           <WaitlistPill />
         </div>
 
@@ -226,13 +246,13 @@ export default function Hero() {
             because the right column is only ~180px wide at the md breakpoint. */}
         <div
           className="absolute flex items-center"
-          style={{ left: "calc(75% + 7px)", top: "68.359%", height: 42 }}
+          style={{ left: "calc(75% + 7px)", top: "80.078%", height: 42 }}
         >
           <p
             className="font-serif uppercase whitespace-nowrap text-glow-cyan"
             style={{ fontSize: "clamp(18px, 2.2vw, 32px)", letterSpacing: "-0.32px", lineHeight: 0.9 }}
           >
-            Live on Arbitrum soon
+            Live on Arbitrum in Q4
           </p>
         </div>
 
@@ -281,23 +301,27 @@ export default function Hero() {
           </div>
         </div>
 
+        {/* Status line, between the intro copy and the mark rather than above the CTA.
+            It used to sit on its own line just above the CTA, right-aligned, reading as the
+            CTA's pair — it cannot share the CTA's row, since pill, line and socials come to
+            ~344px against 327px of content width at 375px.
+
+            Left-aligned here because it now sits in a left-aligned column under the eyebrow;
+            kept right-aligned it would be stranded mid-stack with nothing to align to. */}
+        <p
+          className="relative mt-5 font-serif uppercase text-glow-cyan"
+          style={{ fontSize: 20, letterSpacing: "-0.2px", lineHeight: 0.9 }}
+        >
+          Live on Arbitrum in Q4
+        </p>
+
         {/* min-h-0 is load-bearing: a flex item's default min-height:auto would let the
             canvas's intrinsic size win and push the CTA back off the screen. */}
         <div className="relative mx-auto mt-4 w-full max-w-[380px] flex-1 min-h-0">
           <GlossyLogo />
         </div>
 
-        {/* Same status line. It cannot share the CTA's row here — pill, line and socials
-            come to ~344px against 327px of content width at 375px — so it takes its own
-            right-aligned line directly above, which keeps it reading as the CTA's pair. */}
-        <p
-          className="relative mt-6 text-right font-serif uppercase text-glow-cyan"
-          style={{ fontSize: 20, letterSpacing: "-0.2px", lineHeight: 0.9 }}
-        >
-          Live on Arbitrum soon
-        </p>
-
-        <div className="relative mt-3 flex items-center justify-between">
+        <div className="relative mt-6 flex items-center justify-between">
           <WaitlistPill />
           <Socials />
         </div>
